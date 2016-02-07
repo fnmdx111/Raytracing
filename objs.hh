@@ -2,8 +2,11 @@
 #ifndef __H_OBJS__
 #define __H_OBJS__
 
+#include <vector>
 #include "float3.hh"
 #include "lights.hh"
+
+using namespace std;
 
 class Material
 {
@@ -17,6 +20,10 @@ public:
     i(float3(air, aig, aib)), r(ar) {}
 };
 
+class Ray;
+
+class Intersection;
+
 class Shape
 {
 public:
@@ -25,9 +32,10 @@ public:
   void set_material(const Material* material) {
     mat = material;
   }
-};
 
-class Ray;
+  virtual int test_with(const Ray& r,
+			vector<Intersection>& v) const = 0;
+};
 
 class Camera
 {
@@ -68,34 +76,21 @@ public:
       float px, float py, float pz):
     d(float3(dx, dy, dz)), p(float3(px, py, pz)) {}
 
-  
+  int test_with(const vector<Shape*>& shapes,
+		vector<Intersection>& is) const;
 };
 
 #include "shapes.hh"
 
-class MaybeIntersection
-{
-public:
-  const bool yes;
-  MaybeIntersection(): yes(false) {}
-};
-
-class JustIntersection : public MaybeIntersection
+class Intersection
 {
 public:
   const bool yes;
   float t, t2;
   float3 p, n;
   const Shape* sp;
-  JustIntersection(float t, float t2, float3 p, float3 n, Shape* sp):
+  Intersection(float t, float t2, float3 p, float3 n, const Shape* sp):
     yes(true), t(t), t2(t2), p(p), n(n), sp(sp) {}
-};
-
-class NoIntersection : public MaybeIntersection
-{
-public:
-  const bool yes;
-  NoIntersection(): yes(false) {}
 };
 
 #endif

@@ -32,6 +32,7 @@ public:
   }
 
   void render();
+  void save(const string& fn) const;
 };
 
 #endif
