@@ -41,25 +41,27 @@ class Camera
 {
 public:
   float3 pos, dir, u, v, w;
-  float d, iw, ih, pw, ph;
+  float d, iw, ih;
+  int pw, ph;
   float r, l, t, b;
   Camera(float x, float y, float z, float vx, float vy, float vz,
-	 float d, float iw, float ih, float pw, float ph):
+	 float d, float iw, float ih, int pw, int ph):
     pos(float3(x, y, z)), dir(float3(vx, vy, vz)),
     u(float3(0., 0., 0.)), v(float3(0., 0., 0.)), w(float3(-vx, -vy, -vz)),
     d(d), iw(iw), ih(ih), pw(pw), ph(ph),
     r(0.), l(0.), t(0.), b(0.)
   {
-    u = float3(0, 1, 0) * d;
+    u = this->dir * float3(0, 1, 0);
     v = u * dir;
 
     u.normalize_();
     v.normalize_();
     w.normalize_();
+    dir.normalize_();
 
-    r = this->iw / 2;
+    r = this->iw / 2.0;
     l = -r;
-    t = this->ih / 2;
+    t = this->ih / 2.0;
     b = -t;
   }
 

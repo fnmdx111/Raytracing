@@ -11,7 +11,9 @@ void Scene::render()
       int count = r.test_with(this->shapes, intersections);
 
       if (count > 0) {
-	this->pixels[j][i] = Rgba(1.0, 0.0, 0.0, 1.0);
+	this->pixels[this->cam.ph - j - 1][i] = Rgba(1.0, 0.0, 0.0, 1.0);
+      } else {
+	this->pixels[this->cam.ph - j - 1][i] = Rgba(0.0, 0.0, 0.0, 1.0);
       }
     }
   }
@@ -19,6 +21,6 @@ void Scene::render()
 
 void Scene::save(const string& fn) const
 {
-  write_rgba(fn, &this->pixels[0][0], (int) this->cam.pw, (int) this->cam.ph);
+  write_rgba(fn, &this->pixels[0][0], this->cam.pw, this->cam.ph);
 }
 

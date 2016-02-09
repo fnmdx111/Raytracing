@@ -53,9 +53,9 @@ parse(const string& filename,
     getline(in, line);
 
     int float_cnt = 0;
-#define get_float(x) do {			\
-      ++float_cnt;				\
-      x = get_token_as_float(line, float_cnt);	\
+#define get_float(x) do {                       \
+      ++float_cnt;                              \
+      x = get_token_as_float(line, float_cnt);  \
     } while (0)
 
     switch (line[0]) {
@@ -70,7 +70,8 @@ parse(const string& filename,
       objs.push_back(s);
 
 #ifdef __DEBUG__
-      printf("debug::sphere: %f %f %f, %f\n", x, y, z, r);
+      printf("debug::sphere: %f %f %f, %f\n", s->pos.x, s->pos.y,
+             s->pos.z, s->r);
 #endif
       break;
     }
@@ -87,14 +88,14 @@ parse(const string& filename,
       get_float(y3);
       get_float(z3);
       STriangle* t = new STriangle(x1, y1, z1,
-				   x2, y2, z2,
-				   x3, y3, z3);
+                                   x2, y2, z2,
+                                   x3, y3, z3);
       t->set_material(last_material);
       objs.push_back(t);
 
 #ifdef __DEBUG__
       printf("debug::triangle: %f %f %f, %f %f %f, %f %f %f\n",
-	     x1, y1, z1, x2, y2, z2, x3, y3, z3);
+             x1, y1, z1, x2, y2, z2, x3, y3, z3);
 #endif
       break;
     }
@@ -130,10 +131,13 @@ parse(const string& filename,
       get_float(ph);
 
       camera = new Camera(x, y, z, vx, vy, vz,
-			  d, iw, ih, pw, ph);
+                          d, iw, ih, int(pw), int(ph));
 #ifdef __DEBUG__
-      printf("debug::camera: %f %f %f, %f %f %f, %f, %f %f, %f %f\n",
-	     x, y, z, vx, vy, vz, d, iw, ih, pw, ph);
+      printf("debug::camera: %f %f %f, %f %f %f, %f, %f %f, %d %d\n",
+             camera->pos.x, camera->pos.y, camera->pos.z,
+	     camera->dir.x, camera->dir.y, camera->dir.z,
+	     camera->d,
+	     camera->iw, camera->ih, camera->pw, camera->ph);
 #endif
       break;
     }
@@ -141,49 +145,49 @@ parse(const string& filename,
     case 'l': {
       switch (line[2]) {
       case 'p': {
-	float x, y, z, r, g, b;
-	get_float(x);
-	get_float(y);
-	get_float(z);
-	get_float(r);
-	get_float(g);
-	get_float(b);
-	LPoint* p = new LPoint(x, y, z, r, g, b);
-	lights.push_back(p);
+        float x, y, z, r, g, b;
+        get_float(x);
+        get_float(y);
+        get_float(z);
+        get_float(r);
+        get_float(g);
+        get_float(b);
+        LPoint* p = new LPoint(x, y, z, r, g, b);
+        lights.push_back(p);
 #ifdef __DEBUG__
-	printf("debug::light point: %f %f %f, %f %f %f\n",
-	       x, y, z, r, g, b);
+        printf("debug::light point: %f %f %f, %f %f %f\n",
+               x, y, z, r, g, b);
 #endif
-	break;
+        break;
       }
       case 'd': {
-	float vx, vy, vz, r, g, b;
-	get_float(vx);
-	get_float(vy);
-	get_float(vz);
-	get_float(r);
-	get_float(g);
-	get_float(b);
-	LDirectional* ld = new LDirectional(vx, vy, vz, r, g, b);
-	lights.push_back(ld);
+        float vx, vy, vz, r, g, b;
+        get_float(vx);
+        get_float(vy);
+        get_float(vz);
+        get_float(r);
+        get_float(g);
+        get_float(b);
+        LDirectional* ld = new LDirectional(vx, vy, vz, r, g, b);
+        lights.push_back(ld);
 #ifdef __DEBUG__
-	printf("debug::light directional: %f %f %f, %f %f %f\n",
-	       vx, vy, vz, r, g, b);
+        printf("debug::light directional: %f %f %f, %f %f %f\n",
+               vx, vy, vz, r, g, b);
 #endif
-	break;
+        break;
       }
       case 'a': {
-	float r, g, b;
-	get_float(r);
-	get_float(g);
-	get_float(b);
-	LAmbient* la = new LAmbient(r, g, b);
-	lights.push_back(la);
+        float r, g, b;
+        get_float(r);
+        get_float(g);
+        get_float(b);
+        LAmbient* la = new LAmbient(r, g, b);
+        lights.push_back(la);
 #ifdef __DEBUG__
-	printf("debug::light ambient: %f %f %f\n",
-	       r, g, b);
+        printf("debug::light ambient: %f %f %f\n",
+               r, g, b);
 #endif
-	break;
+        break;
       }
       }
       break;
@@ -201,11 +205,11 @@ parse(const string& filename,
       get_float(ig);
       get_float(ib);
       last_material = new Material(dr, dg, db, sr, sg, sb,
-				   r, ir, ig, ib);
+                                   r, ir, ig, ib);
       mats.push_back(last_material);
 #ifdef __DEBUG__
       printf("debug::material: %f %f %f, %f %f %f, %f, %f %f %f\n",
-	     dr, dg, db, sr, sg, sb, r, ir, ig, ib);
+             dr, dg, db, sr, sg, sb, r, ir, ig, ib);
 #endif
     }
     }

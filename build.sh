@@ -1,0 +1,1 @@
+g++ -D__DEBUG__ src/*.cc -Iinclude -D_THREAD_SAFE -I/usr/local/Cellar/openexr/2.2.0/include/OpenEXR -I/usr/local/Cellar/ilmbase/2.2.0/include/OpenEXR -L/usr/local/Cellar/openexr/2.2.0/lib -L/usr/local/Cellar/ilmbase/2.2.0/lib -lIlmImf -lImath -lHalf -lIex -lIexMath -lIlmThread -Wall -o raytra

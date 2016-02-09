@@ -40,7 +40,7 @@ int
 Ray::test_with(const vector<Shape*>& shapes,
 	       vector<Intersection>& is) const
 {
-  unsigned int count = 0;
+  int count = 0;
 
   for (size_t i = 0; i < shapes.size(); ++i) {
     count += shapes[i]->test_with(*this, is);

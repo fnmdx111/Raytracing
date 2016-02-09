@@ -43,6 +43,7 @@ SSphere::test_with(const Ray& r,
 			     this));
 
     return 1;
+
   } else {
     poly2 = -sqrt(poly2);
   REPEAT:
