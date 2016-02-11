@@ -39,7 +39,7 @@ parse(const string& filename,
       vector<Light*>& lights,
       Camera*& camera)
 {
-  ifstream in(filename);
+  ifstream in(filename.c_str());
   string line;
 
   if (!in.is_open()) {

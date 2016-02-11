@@ -48,3 +48,15 @@ Ray::test_with(const vector<Shape*>& shapes,
 
   return count;
 }
+
+Intersection&
+Intersection::operator =(const Intersection& i)
+{
+  this->t = i.t;
+  this->t2 = i.t2;
+  this->sp = i.sp;
+  this->p = i.p;
+  this->n = i.n;
+
+  return *this;
+}

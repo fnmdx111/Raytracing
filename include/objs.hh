@@ -87,12 +87,12 @@ public:
 class Intersection
 {
 public:
-  const bool yes;
   float t, t2;
   float3 p, n;
   const Shape* sp;
   Intersection(float t, float t2, float3 p, float3 n, const Shape* sp):
-    yes(true), t(t), t2(t2), p(p), n(n), sp(sp) {}
+    t(t), t2(t2), p(p), n(n), sp(sp) {}
+  Intersection& operator =(const Intersection& i);
 };
 
 #endif
