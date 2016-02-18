@@ -137,7 +137,7 @@ float3::sq_dist(const float3& o) const
 float3
 float3::pll_mul(const float3& o) const
 {
-  return float3(this->x * o.x, this->y * o.y, this->z * z);
+  return float3(this->x * o.x, this->y * o.y, this->z * o.z);
 }
 
 string
