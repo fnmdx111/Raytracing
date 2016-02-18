@@ -2,31 +2,42 @@
 #define __H_LIGHTS__
 
 #include "float3.hh"
+#include "objs.hh"
 
-class Light {};
+class Light
+{
+public:
+  float3 clr;
+  virtual float3 l(const Intersection& in) const = 0;
+  Light(double r, double g, double b): clr(float3(r, g, b)) {}
+};
 
 class LPoint : public Light
 {
 public:
-  float3 pos, clr;
-  LPoint(float x, float y, float z, float r, float g, float b):
-    pos(float3(x, y, z)), clr(float3(r, g, b)) {}
+  float3 pos;
+  LPoint(double x, double y, double z, double r, double g, double b):
+    Light(r, g, b),
+    pos(float3(x, y, z)) {}
+  float3 l(const Intersection& in) const;
 };
 
 class LDirectional : public Light
 {
 public:
-  float3 v, clr;
-  LDirectional(float vx, float vy, float vz, float r, float g, float b):
-    v(float3(vx, vy, vz)),
-    clr(float3(r, g, b)) {}
+  float3 v;
+  LDirectional(double vx, double vy, double vz, double r, double g, double b):
+    Light(r, g, b),
+    v(float3(vx, vy, vz)) {}
+
+  float3 l(const Intersection& in) const;
 };
 
 class LAmbient : public Light
 {
 public:
-  float3 clr;
-  LAmbient(float r, float g, float b): clr(float3(r, g, b)) {}
+  LAmbient(double r, double g, double b): Light(r, g, b) {}
+  float3 l(const Intersection& in) const;
 };
 
 #endif

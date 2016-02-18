@@ -1,11 +1,9 @@
 #ifndef __H_SCENE__
 #define __H_SCENE__
 
-#include "parse.hh"
-#include <ImfRgbaFile.h>
-#include <ImfArray.h>
-
-using namespace Imf;
+#include "objs.hh"
+#include "lights.hh"
+#include "camera.hh"
 
 class Scene
 {
@@ -15,24 +13,17 @@ public:
   vector<Light*> lights;
   vector<Material*> materials;
 
-  Array2D<Rgba> pixels;
-
   Scene(const string& fn): cam(Camera(0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-				      0.)),
+				      0., 0)),
 			   shapes(vector<Shape*>()),
 			   lights(vector<Light*>()),
 			   materials(vector<Material*>())
   {
-    Camera* dummy = 0;
-    parse(fn, this->shapes, this->materials, this->lights, dummy);
-    this->cam.copy(*dummy);
-    delete dummy;
-
-    pixels.resizeErase(this->cam.ph, this->cam.pw);
+    parse(fn);
   }
 
-  void render();
-  void save(const string& fn) const;
+private:
+  void parse(const string& fn);
 };
 
 #endif

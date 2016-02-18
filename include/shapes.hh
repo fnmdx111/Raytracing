@@ -8,9 +8,9 @@ class SSphere : public Shape
 {
 public:
   float3 pos;
-  float r;
+  double r;
 
-  SSphere(float x, float y, float z, float r): pos(float3(x, y, z)), r(r) {}
+  SSphere(double x, double y, double z, double r): pos(float3(x, y, z)), r(r) {}
 
   virtual int test_with(const Ray& r,
 			vector<Intersection>& v) const;
@@ -21,9 +21,9 @@ class STriangle : public Shape
 public:
   float3 pos1, pos2, pos3;
 
-  STriangle(float x1, float y1, float z1,
-	    float x2, float y2, float z2,
-	    float x3, float y3, float z3):
+  STriangle(double x1, double y1, double z1,
+	    double x2, double y2, double z2,
+	    double x3, double y3, double z3):
     pos1(float3(x1, y1, z1)),
     pos2(float3(x2, y2, z2)),
     pos3(float3(x3, y3, z3)) {}
@@ -37,9 +37,9 @@ class SPlane : public Shape
 {
 public:
   float3 n;
-  float d;
+  double d;
 
-  SPlane(float nx, float ny, float nz, float d):
+  SPlane(double nx, double ny, double nz, double d):
     n(float3(nx, ny, nz)), d(d) {}
 
   virtual int test_with(const Ray& r,
