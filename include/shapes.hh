@@ -12,8 +12,9 @@ public:
 
   SSphere(double x, double y, double z, double r): pos(float3(x, y, z)), r(r) {}
 
-  virtual int test_with(const Ray& r,
+  int test_with(const Ray& r,
 			vector<Intersection>& v) const;
+  ShapeType type() const;
 };
 
 class STriangle : public Shape
@@ -28,9 +29,9 @@ public:
     pos2(float3(x2, y2, z2)),
     pos3(float3(x3, y3, z3)) {}
 
-  virtual int test_with(const Ray& r,
+  int test_with(const Ray& r,
 			vector<Intersection>& v) const;
-
+  ShapeType type() const;
 };
 
 class SPlane : public Shape
@@ -42,9 +43,9 @@ public:
   SPlane(double nx, double ny, double nz, double d):
     n(float3(nx, ny, nz)), d(d) {}
 
-  virtual int test_with(const Ray& r,
+  int test_with(const Ray& r,
 			vector<Intersection>& v) const;
-
+  ShapeType type() const;
 };
 
 #endif

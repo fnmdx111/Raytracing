@@ -3,6 +3,37 @@
 
 using namespace std;
 
+const string Shape::__sphere = "sphere";
+const string Shape::__triangle = "triangle";
+const string Shape::__plane = "plane";
+const string Shape::__unknown = "unknown";
+
+float3
+Material::ambient(const Light& lgh) const
+{
+  return this->d.pll_mul(lgh.clr);
+}
+
+float3
+Material::diffuse(const Light& lgh, const Intersection& in) const
+{
+  double d = in.n.dot(lgh.l(in));
+  d = max(0., d);
+
+  return this->d.pll_mul(lgh.clr) * d;
+}
+
+float3
+Material::specular(const Light& lgh, const Intersection& in,
+                   const float3& v) const
+{
+  double d = in.n.dot(bisector(v, lgh.l(in)));
+  d = max(0., d);
+  d = pow(d, this->r);
+
+  return this->s.pll_mul(lgh.clr) * d;
+}
+
 int
 Ray::test_with(const vector<Shape*>& shapes,
                vector<Intersection>& is) const
@@ -27,4 +58,3 @@ Intersection::operator =(const Intersection& i)
 
   return *this;
 }
-

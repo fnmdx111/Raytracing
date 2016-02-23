@@ -6,6 +6,18 @@ using namespace std;
 
 #define SQ(x) ((x) * (x))
 
+bool
+float3::operator ==(const float3& y) const
+{
+  if (FEQ(this->x, y.x)
+      && FEQ(this->y, y.y)
+      && FEQ(this->z, y.z)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 float3
 float3::operator +(const float3& y) const
 {

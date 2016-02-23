@@ -12,6 +12,7 @@ struct float3
   float3(double x, double y, double z): x(x), y(y), z(z) {}
   float3(): x(0.), y(0.), z(0.) {}
 
+  bool operator ==(const float3& y) const;
   float3 operator +(const float3& y) const;
   float3 operator -(const float3& y) const;
   float3 operator *(const float3& y) const;

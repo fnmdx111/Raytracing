@@ -4,11 +4,15 @@
 #include "float3.hh"
 #include "objs.hh"
 
+enum LightType { point, directional, ambient };
+
 class Light
 {
 public:
+
   float3 clr;
   virtual float3 l(const Intersection& in) const = 0;
+  virtual LightType type() const = 0;
   Light(double r, double g, double b): clr(float3(r, g, b)) {}
 };
 
@@ -20,6 +24,7 @@ public:
     Light(r, g, b),
     pos(float3(x, y, z)) {}
   float3 l(const Intersection& in) const;
+  LightType type() const;
 };
 
 class LDirectional : public Light
@@ -28,9 +33,13 @@ public:
   float3 v;
   LDirectional(double vx, double vy, double vz, double r, double g, double b):
     Light(r, g, b),
-    v(float3(vx, vy, vz)) {}
+    v(float3(vx, vy, vz))
+  {
+    v.normalize_();
+  }
 
   float3 l(const Intersection& in) const;
+  LightType type() const;
 };
 
 class LAmbient : public Light
@@ -38,6 +47,7 @@ class LAmbient : public Light
 public:
   LAmbient(double r, double g, double b): Light(r, g, b) {}
   float3 l(const Intersection& in) const;
+  LightType type() const;
 };
 
 #endif

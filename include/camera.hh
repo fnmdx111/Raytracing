@@ -50,6 +50,9 @@ public:
   void copy(const Camera& other);
   inline void accum_pixel(int i, int j, const float3& rgb);
   inline void set_pixel(int i, int j, const float3& rgb);
+  bool is_shadowed(const Light& lgh, const Intersection& in,
+                   const Ray& pr) const;
+  void ray_color(const Ray& r, float3& clr) const;
   void render();
   void save(const string& s) const;
 };

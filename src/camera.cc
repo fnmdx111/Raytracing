@@ -67,52 +67,75 @@ Camera::Camera(const Camera& other)
   copy(other);
 }
 
-#define max_(__t, __d) ((__t) > (__d) ? (__t) : (__d))
-
-void
-do_lambertian(int x, int y,
-              Camera& cam,
-              const vector<Light*>& lights,
-              const Intersection& in)
+bool
+Camera::is_shadowed(const Light& lgh, const Intersection& in,
+                    const Ray& pr) const
 {
-  const Material& mat = *(in.sp->mat);
+  float3 l = lgh.l(in);
 
-  for (int i = 0; i < lights.size(); ++i) {
-    const Light& lgh = *lights[i];
-    const float3& l = lgh.l(in);
+  float3 pp = in.p + pr.d * -0.000001;
+  Ray r(l.x, l.y, l.z,
+        pp.x, pp.y, pp.z);
 
-    if (isnan(l.x)) {
-      // ambient light
-      // cam.accum_pixel(x, y, mat.d.pll_mul(lgh.clr));
-    } else {
-      double d = in.n.dot(l);
-      d = max_(0., d);
+  vector<Intersection> ins;
+  for (int i = 0; i < scene->shapes.size(); ++i) {
+    if (scene->shapes[i] == in.sp) {
+      continue;
+    }
 
-      cam.accum_pixel(x, y, mat.d.pll_mul(lgh.clr) * d);
+    if (scene->shapes[i]->test_with(r, ins) > 0) {
+      return true;
     }
   }
+
+  return false;
 }
 
 void
-do_specular(int x, int y,
-            Camera& cam,
-            const vector<Light*>& lights,
-            const Intersection& in,
-            const float3& v)
+Camera::ray_color(const Ray& r, float3& clr) const
 {
+  vector<Intersection> ins;
+  const int count = r.test_with(scene->shapes, ins);
+
+  if (count <= 0) {
+    return;
+  }
+
+  int idx = -1;
+  double min_dist = numeric_limits<double>::max();
+
+  for (int k = 0; k < ins.size(); ++k) {
+    const double dist = pos.sq_dist(ins[k].p);
+
+    if (min_dist > dist) {
+      idx = k;
+      min_dist = dist;
+    }
+  }
+
+  if (idx < 0) {
+    return;
+  }
+
+  const Intersection& in = ins[idx];
   const Material& mat = *(in.sp->mat);
+  for (int k = 0; k < scene->lights.size(); ++k) {
+    const Light& lgh = *(scene->lights[k]);
 
-  for (int i = 0; i < lights.size(); ++i) {
-    const Light& lgh = *lights[i];
-    const float3& l = lgh.l(in);
+    if (lgh.type() == LightType::point
+        || lgh.type() == LightType::directional) {
+      if (is_shadowed(lgh, in, r)) {
+        // printf("shadowed: %s\n", Shape::to_s(in.sp->type()).c_str());
+      } else {
+        // printf("not shadowed: %s\n", Shape::to_s(in.sp->type()).c_str());
 
-    if (isnan(l.x)) {
-    } else {
-      double d = in.n.dot(bisector(v, l));
-      d = max_(0., d);
-      d = pow(d, mat.r);
+        clr += mat.diffuse(lgh, in);
 
-      cam.accum_pixel(x, y, mat.s.pll_mul(lgh.clr) * d);
+        const float3& nd = r.d * -1;
+        clr += mat.specular(lgh, in, nd);
+      }
+    } else if (lgh.type() == LightType::ambient) {
+      clr += mat.ambient(lgh);
     }
   }
 }
@@ -120,50 +143,14 @@ do_specular(int x, int y,
 void
 Camera::render()
 {
-  for (int i = 0; i < pw; ++i) {
-    for (int j = 0; j < ph; ++j) {
-      set_pixel(i, j, float3(0., 0., 0.));
+  for (int x = 0; x < pw; ++x) {
+    for (int y = 0; y < ph; ++y) {
+      Ray r = ray(x, y);
+      float3 clr(0., 0., 0.);
 
-      Ray r = ray(i, j);
-      vector<Intersection> ins;
-      const int count = r.test_with(scene->shapes, ins);
+      ray_color(r, clr);
 
-      if (count <= 0) {
-        continue;
-      }
-
-      int idx = -1;
-      double min_dist = numeric_limits<double>::max();
-
-      for (int k = 0; k < ins.size(); ++k) {
-        const double dist = pos.sq_dist(ins[k].p);
-
-        if (min_dist > dist) {
-          idx = k;
-          min_dist = dist;
-        }
-      }
-
-      if (idx < 0) {
-        cout << "wtf!" << endl;
-        continue;
-      }
-
-      do_lambertian(i, j,
-                    *this,
-                    this->scene->lights,
-                    ins[idx]);
-
-#ifdef __DEBUG__
-      printf("done lambertian\n");
-#endif
-
-      r.d.negate();
-      do_specular(i, j,
-                  *this,
-                  this->scene->lights,
-                  ins[idx],
-                  r.d);
+      set_pixel(x, y, clr);
     }
   }
 }

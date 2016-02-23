@@ -5,6 +5,24 @@
 
 using namespace std;
 
+ShapeType
+SPlane::type() const
+{
+  return ShapeType::plane;
+}
+
+ShapeType
+STriangle::type() const
+{
+  return ShapeType::triangle;
+}
+
+ShapeType
+SSphere::type() const
+{
+  return ShapeType::sphere;
+}
+
 int
 SPlane::test_with(const Ray& r,
                   vector<Intersection>& v) const
@@ -86,12 +104,16 @@ SSphere::test_with(const Ray& r,
 
   double poly1 = -1 * ddotdd;
   double poly2 = SQ(ddotdd) - ddotd * (delta.dot(delta) - SQ(this->r));
-
+#define SEPSILON 1e-7
   if (poly2 < 0.) {
     return 0;
 
   } else if (FEQ(poly2, 0.0)) {
     double t = poly1 / ddotd;
+    if (t < SEPSILON) {
+      return 0;
+    }
+
     float3 pos = r.p + r.d * t;
     v.push_back(Intersection(t, SQ(t),
                              pos,
@@ -102,15 +124,22 @@ SSphere::test_with(const Ray& r,
 
   } else {
     poly2 = -sqrt(poly2);
+    int count = 0;
     REPEAT:
     double t = (poly1 + poly2) / ddotd;
+
+    if (t < SEPSILON) {
+      return count;
+    }
+    ++count;
+
     float3 pos = r.p + r.d * t;
     v.push_back(Intersection(t, SQ(t),
                              pos,
                              (pos - this->pos) * (1 / this->r),
                              this));
     if (poly2 > 0) {
-      return 2;
+      return count;
     }
 
     poly2 = -poly2;
