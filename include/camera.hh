@@ -9,6 +9,17 @@ using namespace Imf;
 
 class Scene;
 
+
+#ifdef ANTIALIASING
+#define NSAMPLE 4
+#endif
+
+#ifdef SPECULAR_REFLECTION
+#define MAXRECUR 10
+#endif
+
+#define CAMEPSILON -0.000001
+
 class Camera
 {
 public:
@@ -46,13 +57,15 @@ public:
 
   Camera(const Camera& cam);
 
-  Ray ray(int i, int j);
+  Ray ray(double i, double j);
   void copy(const Camera& other);
   inline void accum_pixel(int i, int j, const float3& rgb);
   inline void set_pixel(int i, int j, const float3& rgb);
   bool is_shadowed(const Light& lgh, const Intersection& in,
                    const Ray& pr) const;
-  void ray_color(const Ray& r, float3& clr) const;
+  void ray_color(const Ray& r, float3& clr, int recursion_depth) const;
+  void specular_reflection(const Intersection& in, const Ray& r,
+                           float3& clr, int recursion_depth) const;
   void render();
   void save(const string& s) const;
 };

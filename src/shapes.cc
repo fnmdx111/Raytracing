@@ -82,7 +82,7 @@ STriangle::test_with(const Ray& r,
   }
 
   DEF(t, (f * akmjb + e * jcmal + d * blmkc) / M);
-  if (t >= 1e-10) { // why?
+  if (t >= -1e-10) { // why?
     return 0;
   }
 

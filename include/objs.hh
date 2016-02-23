@@ -69,6 +69,15 @@ public:
   Ray(double dx, double dy, double dz,
       double px, double py, double pz):
     d(float3(dx, dy, dz)), p(float3(px, py, pz)) {}
+  Ray(const float3& dd, const float3& pp)
+  {
+    this->d.x = dd.x;
+    this->d.y = dd.y;
+    this->d.z = dd.z;
+    this->p.x = pp.x;
+    this->p.y = pp.y;
+    this->p.z = pp.z;
+  };
 
   int test_with(const vector<Shape*>& shapes,
                 vector<Intersection>& is) const;

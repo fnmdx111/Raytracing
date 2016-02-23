@@ -4,12 +4,13 @@
 #include <vector>
 #include <limits>
 #include "camera.hh"
-
+#include <chrono>
+#include <random>
 
 using namespace std;
 
 Ray
-Camera::ray(int i, int j)
+Camera::ray(double i, double j)
 {
   double su = this->l + (this->r - this->l) * (i + 0.5) / this->pw;
   double sv = this->b + (this->t - this->b) * (j + 0.5) / this->ph;
@@ -67,13 +68,29 @@ Camera::Camera(const Camera& other)
   copy(other);
 }
 
+void
+Camera::specular_reflection(const Intersection& in, const Ray& r,
+                            float3& clr, int recursion_depth) const
+{
+  if (recursion_depth > MAXRECUR) {
+    return;
+  }
+
+  float3 rf = r.d - in.n * 2 * r.d.dot(in.n);
+  float3 pp = in.p + rf * CAMEPSILON;
+
+  float3 acc(0., 0., 0.);
+  ray_color(Ray(rf, pp), acc, recursion_depth + 1);
+  clr += in.sp->mat->s.pll_mul(acc);
+}
+
 bool
 Camera::is_shadowed(const Light& lgh, const Intersection& in,
                     const Ray& pr) const
 {
   float3 l = lgh.l(in);
 
-  float3 pp = in.p + pr.d * -0.000001;
+  float3 pp = in.p + pr.d * CAMEPSILON;
   Ray r(l.x, l.y, l.z,
         pp.x, pp.y, pp.z);
 
@@ -92,7 +109,7 @@ Camera::is_shadowed(const Light& lgh, const Intersection& in,
 }
 
 void
-Camera::ray_color(const Ray& r, float3& clr) const
+Camera::ray_color(const Ray& r, float3& clr, int recursion_depth) const
 {
   vector<Intersection> ins;
   const int count = r.test_with(scene->shapes, ins);
@@ -133,6 +150,13 @@ Camera::ray_color(const Ray& r, float3& clr) const
 
         const float3& nd = r.d * -1;
         clr += mat.specular(lgh, in, nd);
+
+#ifdef SPECULAR_REFLECTION
+        if (FEQ(mat.s.x, 0.0) && FEQ(mat.s.y, 0.0) && FEQ(mat.s.z, 0.0)) {
+        } else {
+          specular_reflection(in, r, clr, recursion_depth);
+        }
+#endif
       }
     } else if (lgh.type() == LightType::ambient) {
       clr += mat.ambient(lgh);
@@ -143,16 +167,44 @@ Camera::ray_color(const Ray& r, float3& clr) const
 void
 Camera::render()
 {
+  printf("Shyoujyou rendering...\n");
+
+  auto begin = chrono::steady_clock::now();
+
+  double total = pw * ph;
+
+  std::random_device rd;
+  std::mt19937 e2(rd());
+  std::uniform_real_distribution<> dist(0.0, 0.999999999);
+
+  long cnt = 0;
   for (int x = 0; x < pw; ++x) {
     for (int y = 0; y < ph; ++y) {
-      Ray r = ray(x, y);
+      printf("\rRendered %0.03f%%", ((++cnt) / total) * 100.);
+
       float3 clr(0., 0., 0.);
+#ifdef ANTIALIASING
+      for (int p = 0; p < NSAMPLE; ++p) {
+        for (int q = 0; q < NSAMPLE; ++q) {
+          Ray r = ray(x + (p + dist(e2)) / NSAMPLE,
+                      y + (q + dist(e2)) / NSAMPLE);
 
-      ray_color(r, clr);
+          ray_color(r, clr, 0);
+        }
+      }
 
+      set_pixel(x, y, clr * (1. / SQ(NSAMPLE)));
+#else
+      Ray r = ray(x + 0.5, y + 0.5);
+      ray_color(r, clr, 0);
       set_pixel(x, y, clr);
+#endif
     }
   }
+
+  auto end = chrono::steady_clock::now();
+  printf(".\nDone in %lld seconds.\n",
+         chrono::duration_cast<chrono::seconds>(end - begin).count());
 }
 
 void
