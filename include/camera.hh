@@ -10,11 +10,11 @@ using namespace Imf;
 class Scene;
 
 
-#ifdef ANTIALIASING
+#ifdef FEAT_ANTIALIASING
 #define NSAMPLE 4
 #endif
 
-#ifdef SPECULAR_REFLECTION
+#ifdef FEAT_SPECULAR_REFLECTION
 #define MAXRECUR 10
 #endif
 
@@ -61,11 +61,15 @@ public:
   void copy(const Camera& other);
   inline void accum_pixel(int i, int j, const float3& rgb);
   inline void set_pixel(int i, int j, const float3& rgb);
+#ifdef FEAT_SHADOW
   bool is_shadowed(const Light& lgh, const Intersection& in,
                    const Ray& pr) const;
+#endif
   void ray_color(const Ray& r, float3& clr, int recursion_depth) const;
+#ifdef FEAT_SPECULAR_REFLECTION
   void specular_reflection(const Intersection& in, const Ray& r,
                            float3& clr, int recursion_depth) const;
+#endif
   void render();
   void save(const string& s) const;
 };

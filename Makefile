@@ -1,5 +1,8 @@
+
 all:
-	g++ -DANTIALIASING -DSPECULAR_REFLECTION -O2 src/*.cc -Iinclude `pkg-config --cflags OpenEXR` `pkg-config --libs OpenEXR` -o raytra --std=c++11
+	g++ -DFEAT_SHADOW -DFEAT_ANTIALIASING -DFEAT_SPECULAR_REFLECTION -DPROGRESS -O3 src/*.cc -Iinclude `pkg-config --cflags OpenEXR` `pkg-config --libs OpenEXR` -o raytra --std=c++11
 
 debug:
-	g++ -DANTIALIASING -DSPECULAR_REFLECTION -D__DEBUG__ src/*.cc -Iinclude `pkg-config --cflags OpenEXR` `pkg-config --libs OpenEXR` -o raytra --std=c++11
+	g++ -DFEAT_SHADOW -DPROGRESS -D__DEBUG__ src/*.cc -Iinclude `pkg-config --cflags OpenEXR` `pkg-config --libs OpenEXR` -o raytra --std=c++11
+
+# -DFEAT_ANTIALIASING -DFEAT_SPECULAR_REFLECTION 

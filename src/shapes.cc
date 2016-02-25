@@ -3,6 +3,8 @@
 #include <cmath>
 #include <vector>
 
+#define SEPSILON 1e-7
+
 using namespace std;
 
 ShapeType
@@ -28,13 +30,13 @@ SPlane::test_with(const Ray& r,
                   vector<Intersection>& v) const
 {
   double denom = r.d.dot(this->n);
-  if (FEQ(denom, 0.)) {
+  if (denom > 0.) {
     return 0;
   }
 
-  double t = (r.p.dot(this->n) * -1 + this->d) / denom;
-  if (t <= 1e-10) {
-    return  0;
+  double t = (r.p.dot(this->n) + this->d) / -denom;
+  if (t < SEPSILON) {
+    return 0;
   }
 
   float3 p = r.p + r.d * t;
@@ -71,6 +73,11 @@ STriangle::test_with(const Ray& r,
 
   DEF(M, a * eimhf + b * gfmdi + c * dhmeg);
 
+  DEF(t, -(f * akmjb + e * jcmal + d * blmkc) / M);
+  if (t < SEPSILON) {
+    return 0;
+  }
+
   DEF(C, (i * akmjb + h * jcmal + g * blmkc) / M);
   if (C < 0 || C > 1) {
     return 0;
@@ -81,14 +88,8 @@ STriangle::test_with(const Ray& r,
     return 0;
   }
 
-  DEF(t, (f * akmjb + e * jcmal + d * blmkc) / M);
-  if (t >= -1e-10) { // why?
-    return 0;
-  }
-
   float3 p = r.p + r.d * t;
-  float3 n = ((pos1 - pos2) * (pos1 - pos3)).normalize();
-  v.push_back(Intersection(t, SQ(t), p, n, this));
+  v.push_back(Intersection(t, SQ(t), p, this->n, this));
 
   return 1;
 }
@@ -104,7 +105,6 @@ SSphere::test_with(const Ray& r,
 
   double poly1 = -1 * ddotdd;
   double poly2 = SQ(ddotdd) - ddotd * (delta.dot(delta) - SQ(this->r));
-#define SEPSILON 1e-7
   if (poly2 < 0.) {
     return 0;
 

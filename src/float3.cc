@@ -76,9 +76,9 @@ float3::operator -=(const float3& y)
 }
 
 double
-float3::dot(const float3& y) const
+float3::dot(const float3& o) const
 {
-  return this->x * y.x + this->y * y.y + this->z * y.z;
+  return x * o.x + y * o.y + z * o.z;
 }
 
 float3&

@@ -48,6 +48,8 @@ get_token_as_float(string in, int which)
 void
 Scene::parse(const string& filename)
 {
+  printf("Shyoujyou parsing...\n");
+
   vector<Shape*>& objs = this->shapes;
   vector<Light*>& lights = this->lights;
   vector<Material*>& mats = this->materials;

@@ -10,7 +10,7 @@ LPoint::l(const Intersection& in) const
 }
 
 float3
-LDirectional::l(const Intersection& in) const
+LDirectional::l(const Intersection& _) const
 {
   return v;
 }
