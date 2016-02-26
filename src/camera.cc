@@ -7,6 +7,7 @@
 #include <chrono>
 #include <random>
 #include "shapes.hh"
+#include <cassert>
 
 using namespace std;
 
@@ -69,64 +70,42 @@ Camera::Camera(const Camera& other)
   copy(other);
 }
 
-#ifdef FEAT_SPECULAR_REFLECTION
-void
-Camera::specular_reflection(const Intersection& in, const Ray& r,
-                            float3& clr, int recursion_depth) const
+#define RCLR_SHADOW_YES 0x80000001
+#define RCLR_SHADOW_NO 0x80000002
+#define RCLR_MAX_RECURSION 0x70000003
+#define RCLR_NO_INTERSECTION 0x70000004
+#define RCLR_INVALID_IDX 0x60000005
+#define RCLR_NO_IDEAL_SPECULAR 0x80000006
+#define RCLR_OK 0x80000000
+
+int
+Camera::ray_color(int recursion_depth, float3& clr, const Ray& r,
+                  const Light* shadow_lgh,
+                  double t0, double t1) const
 {
   if (recursion_depth > MAXRECUR) {
-    return;
-  }
-
-  float3 rf = r.d - in.n * 2 * r.d.dot(in.n);
-
-  float3 pp = in.p - rf * CAMEPSILON;
-
-  float3 acc(0., 0., 0.);
-  ray_color(Ray(rf, pp), acc, recursion_depth + 1);
-  clr += in.sp->mat->i.pll_mul(acc);
-}
-#endif
-
-#ifdef FEAT_SHADOW
-bool
-Camera::is_shadowed(const Light& lgh, const Intersection& in,
-                    const Ray& pr) const
-{
-  float3 l = lgh.l(in);
-
-  float3 pp = in.p + pr.d * CAMEPSILON;
-  Ray r(l, pp);
-
-  double dist = 0.0;
-  if (lgh.type() == LightType::point) {
-    const LPoint& lpnt = dynamic_cast<const LPoint&>(lgh);
-    dist = lpnt.pos.sq_dist(in.p);
+    return RCLR_MAX_RECURSION;
   }
 
   vector<Intersection> ins;
-  for (int i = 0; i < scene->shapes.size(); ++i) {
-    if (scene->shapes[i] == in.sp) {
-      continue;
-    } else if (scene->shapes[i]->test_with(r, ins,
-                                           SEPSILON, sqrt(dist)) > 0) {
-      return true;
+
+  if (r.type == 's') { // is shadow ray
+    for (int i = 0; i < scene->shapes.size(); ++i) {
+      if (scene->shapes[i]->test_with(r, ins, t0, t1) > 0) {
+        return RCLR_SHADOW_YES;
+      }
     }
+
+    assert(shadow_lgh != 0);
+    clr += shadow_lgh->clr;
+
+    return RCLR_SHADOW_NO;
   }
 
-  return false;
-}
-#endif
-
-void
-Camera::ray_color(const Ray& r, float3& clr, int recursion_depth) const
-{
-  vector<Intersection> ins;
-  const int count = r.test_with(scene->shapes, ins,
-                                SEPSILON, numeric_limits<double>::max());
-
+  int count = r.test_with(scene->shapes, ins,
+                          SEPSILON, numeric_limits<double>::max());
   if (count <= 0) {
-    return;
+    return RCLR_NO_INTERSECTION;
   }
 
   int idx = -1;
@@ -142,41 +121,52 @@ Camera::ray_color(const Ray& r, float3& clr, int recursion_depth) const
   }
 
   if (idx < 0) {
-    return;
+    return RCLR_INVALID_IDX;
   }
 
   const Intersection& in = ins[idx];
   const Material& mat = *(in.sp->mat);
+
   for (int k = 0; k < scene->lights.size(); ++k) {
     const Light& lgh = *(scene->lights[k]);
 
-    if (lgh.type() == LightType::point
-        || lgh.type() == LightType::directional) {
-#ifdef FEAT_SHADOW
-      if (is_shadowed(lgh, in, r)) {
-        // printf("shadowed: %s\n", Shape::to_s(in.sp->type()).c_str());
-      } else {
-        // printf("not shadowed: %s\n", Shape::to_s(in.sp->type()).c_str());
-#endif
+    if (lgh.type() == LightType::ambient) {
+      clr += mat.ambient(lgh);
+    } else {
+      float3 l = lgh.l(in);
+
+      float3 pp = in.p; // + r.d * CAMEPSILON;
+
+      Ray sr(l, pp);
+      sr.type = 's';
+
+      const double dist = lgh.dist(in);
+
+      float3 sclr(0., 0., 0.);
+      ray_color(0, sclr, sr, &lgh, SEPSILON, dist);
+      if (!sclr.is_zero()) {
         clr += mat.diffuse(lgh, in);
 
         const float3& nd = r.d * -1;
         clr += mat.specular(lgh, in, nd);
-#ifdef FEAT_SHADOW
       }
-#endif
-
-#ifdef FEAT_SPECULAR_REFLECTION
-      if (FEQ(mat.i.x, 0.0) && FEQ(mat.i.y, 0.0) && FEQ(mat.i.z, 0.0)) {
-      } else {
-        specular_reflection(in, r, clr, recursion_depth);
-      }
-#endif
-
-    } else if (lgh.type() == LightType::ambient) {
-      clr += mat.ambient(lgh);
     }
   }
+
+  if (mat.i.is_zero()) {
+    return RCLR_NO_IDEAL_SPECULAR;
+  } else {
+    float3 rf = r.d - in.n * 2 * r.d.dot(in.n);
+    float3 pp = in.p - rf * CAMEPSILON;
+    Ray rr(rf, pp);
+
+    float3 acc(0., 0., 0.);
+    ray_color(recursion_depth + 1, acc, rr, 0,
+              SEPSILON, numeric_limits<double>::max());
+    clr += mat.i.pll_mul(acc) * in.n.dot(rf);
+  }
+
+  return RCLR_OK;
 }
 
 void
@@ -199,7 +189,10 @@ Camera::render()
   for (int x = 0; x < pw; ++x) {
     for (int y = 0; y < ph; ++y) {
 #ifdef PROGRESS
-      printf("\rRendered %0.03f%%", ((++cnt) / total) * 100.);
+      if (cnt % 50 == 0
+          && printf("\rRendered %0.03f%%", ((++cnt) / total) * 100.)) {
+        ;
+      }
 #endif
 
       float3 clr(0., 0., 0.);
@@ -209,7 +202,7 @@ Camera::render()
           Ray r = ray(x + (p + dist(e2)) / NSAMPLE,
                       y + (q + dist(e2)) / NSAMPLE);
 
-          ray_color(r, clr, 0);
+          ray_color(0, clr, r, 0, 0., numeric_limits<double>::max());
         }
       }
 
@@ -223,7 +216,10 @@ Camera::render()
   }
 
   auto end = chrono::steady_clock::now();
-  printf(".\nDone in %lld seconds.\n",
+#ifdef PROGRESS
+  printf(".\n");
+#endif
+  printf("Done in %lld seconds.\n",
          chrono::duration_cast<chrono::seconds>(end - begin).count());
 }
 

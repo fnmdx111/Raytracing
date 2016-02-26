@@ -28,6 +28,7 @@ struct float3
   float3 normalize() const;
   double norm() const;
   float3& negate();
+  bool is_zero() const;
 
   float3 pll_mul(const float3& y) const;
 

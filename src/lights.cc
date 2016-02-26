@@ -12,7 +12,7 @@ LPoint::l(const Intersection& in) const
 float3
 LDirectional::l(const Intersection& _) const
 {
-  return v;
+  return nv;
 }
 
 float3
@@ -37,4 +37,10 @@ LightType
 LAmbient::type() const
 {
   return LightType::ambient;
+}
+
+double
+LPoint::dist(const Intersection& in) const
+{
+  return sqrt(pos.sq_dist(in.p));
 }

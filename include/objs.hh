@@ -66,11 +66,12 @@ class Ray
 {
 public:
   float3 d, p;
+  char type;
 
   Ray(double dx, double dy, double dz,
       double px, double py, double pz):
-  d(float3(dx, dy, dz)), p(float3(px, py, pz)) {}
-  Ray(const float3& dd, const float3& pp)
+  d(float3(dx, dy, dz)), p(float3(px, py, pz)), type('r') {}
+  Ray(const float3& dd, const float3& pp): type('r')
   {
     this->d.x = dd.x;
     this->d.y = dd.y;

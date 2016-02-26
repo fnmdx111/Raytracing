@@ -114,6 +114,15 @@ float3::norm() const
   return sqrt(SQ(this->x) + SQ(this->y) +SQ(this->z));
 }
 
+bool
+float3::is_zero() const
+{
+  if (FEQ(x, 0.0) && FEQ(y, 0.0) && FEQ(z, 0.0)) {
+    return true;
+  }
+  return false;
+}
+
 float3
 float3::normalize() const
 {
