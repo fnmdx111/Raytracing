@@ -47,7 +47,8 @@ public:
   }
 
   virtual int test_with(const Ray& r,
-												vector<Intersection>& v) const = 0;
+												vector<Intersection>& v,
+                        double t0, double t1) const = 0;
   virtual ShapeType type() const = 0;
   static const string& to_s(ShapeType s) {
     if (s == ShapeType::sphere) {
@@ -80,7 +81,8 @@ public:
   };
 
   int test_with(const vector<Shape*>& shapes,
-                vector<Intersection>& is) const;
+                vector<Intersection>& is,
+                double t0, double t1) const;
 };
 
 #include "shapes.hh"

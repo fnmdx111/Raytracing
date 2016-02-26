@@ -36,12 +36,13 @@ Material::specular(const Light& lgh, const Intersection& in,
 
 int
 Ray::test_with(const vector<Shape*>& shapes,
-               vector<Intersection>& is) const
+               vector<Intersection>& is,
+               double t0, double t1) const
 {
   int count = 0;
 
   for (size_t i = 0; i < shapes.size(); ++i) {
-    count += shapes[i]->test_with(*this, is);
+    count += shapes[i]->test_with(*this, is, t0, t1);
   }
 
   return count;

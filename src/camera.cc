@@ -6,6 +6,7 @@
 #include "camera.hh"
 #include <chrono>
 #include <random>
+#include "shapes.hh"
 
 using namespace std;
 
@@ -107,14 +108,9 @@ Camera::is_shadowed(const Light& lgh, const Intersection& in,
   for (int i = 0; i < scene->shapes.size(); ++i) {
     if (scene->shapes[i] == in.sp) {
       continue;
-    } else if (scene->shapes[i]->test_with(r, ins) > 0) {
-      for (int j = 0; j < ins.size(); ++j) {
-        if (ins[j].t2 < dist) {
-          return true;
-        }
-      }
-
-      ins.clear();
+    } else if (scene->shapes[i]->test_with(r, ins,
+                                           SEPSILON, sqrt(dist)) > 0) {
+      return true;
     }
   }
 
@@ -126,7 +122,8 @@ void
 Camera::ray_color(const Ray& r, float3& clr, int recursion_depth) const
 {
   vector<Intersection> ins;
-  const int count = r.test_with(scene->shapes, ins);
+  const int count = r.test_with(scene->shapes, ins,
+                                SEPSILON, numeric_limits<double>::max());
 
   if (count <= 0) {
     return;
@@ -175,6 +172,7 @@ Camera::ray_color(const Ray& r, float3& clr, int recursion_depth) const
         specular_reflection(in, r, clr, recursion_depth);
       }
 #endif
+
     } else if (lgh.type() == LightType::ambient) {
       clr += mat.ambient(lgh);
     }
@@ -187,7 +185,6 @@ Camera::render()
   printf("Shyoujyou rendering...\n");
 
   auto begin = chrono::steady_clock::now();
-
 
 #ifdef FEAT_ANTIALIASING
   std::random_device rd;

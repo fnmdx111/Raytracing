@@ -3,7 +3,6 @@
 #include <cmath>
 #include <vector>
 
-#define SEPSILON 1e-7
 
 using namespace std;
 
@@ -27,28 +26,36 @@ SSphere::type() const
 
 int
 SPlane::test_with(const Ray& r,
-                  vector<Intersection>& v) const
+                  vector<Intersection>& v,
+                  double t0, double t1) const
 {
   double denom = r.d.dot(this->n);
-  if (denom > 0.) {
+  if (FEQ(denom, 0.0)) {
     return 0;
   }
 
-  double t = (r.p.dot(this->n) + this->d) / -denom;
-  if (t < SEPSILON) {
+  float3 nn = this->n;
+  if (denom > 0.0) {
+    nn *= -1;
+    denom *= -1;
+  }
+
+  double t = (r.p.dot(nn) + this->d) / -denom;
+  if (t < t0 || t > t1) {
     return 0;
   }
 
   float3 p = r.p + r.d * t;
 
   v.push_back(Intersection(t, SQ(t),
-                           p, this->n, this));
+                           p, nn, this));
   return 1;
 }
 
 int
 STriangle::test_with(const Ray& r,
-                     vector<Intersection>& v) const
+                     vector<Intersection>& v,
+                     double t0, double t1) const
 {
 #define DEF(x, z) const double x = (z)
   DEF(a, pos1.x - pos2.x);
@@ -74,7 +81,7 @@ STriangle::test_with(const Ray& r,
   DEF(M, a * eimhf + b * gfmdi + c * dhmeg);
 
   DEF(t, -(f * akmjb + e * jcmal + d * blmkc) / M);
-  if (t < SEPSILON) {
+  if (t < t0 || t > t1) {
     return 0;
   }
 
@@ -96,7 +103,8 @@ STriangle::test_with(const Ray& r,
 
 int
 SSphere::test_with(const Ray& r,
-                   vector<Intersection>& v) const
+                   vector<Intersection>& v,
+                   double t0, double t1) const
 {
   float3 delta = r.p - this->pos;
 
@@ -110,7 +118,7 @@ SSphere::test_with(const Ray& r,
 
   } else if (FEQ(poly2, 0.0)) {
     double t = poly1 / ddotd;
-    if (t < SEPSILON) {
+    if (t < t0 || t > t1) {
       return 0;
     }
 
@@ -128,7 +136,7 @@ SSphere::test_with(const Ray& r,
     REPEAT:
     double t = (poly1 + poly2) / ddotd;
 
-    if (t < SEPSILON) {
+    if (t < t0 || t > t1) {
       return count;
     }
     ++count;

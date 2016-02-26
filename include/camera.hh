@@ -11,7 +11,7 @@ class Scene;
 
 
 #ifdef FEAT_ANTIALIASING
-#define NSAMPLE 4
+#define NSAMPLE 6
 #endif
 
 #ifdef FEAT_SPECULAR_REFLECTION
