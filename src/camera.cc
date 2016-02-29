@@ -103,7 +103,7 @@ Camera::ray_color(int recursion_depth, float3& clr, const Ray& r,
   }
 
   int count = r.test_with(scene->shapes, ins,
-                          SEPSILON, numeric_limits<double>::max());
+                          t0, t1);
   if (count <= 0) {
     return RCLR_NO_INTERSECTION;
   }
@@ -147,7 +147,7 @@ Camera::ray_color(int recursion_depth, float3& clr, const Ray& r,
       if (!sclr.is_zero()) {
         clr += mat.diffuse(lgh, in);
 
-        const float3& nd = r.d * -1;
+        float3 nd = r.d * -1;
         clr += mat.specular(lgh, in, nd);
       }
     }
@@ -156,14 +156,15 @@ Camera::ray_color(int recursion_depth, float3& clr, const Ray& r,
   if (mat.i.is_zero()) {
     return RCLR_NO_IDEAL_SPECULAR;
   } else {
-    float3 rf = r.d - in.n * 2 * r.d.dot(in.n);
-    float3 pp = in.p - rf * CAMEPSILON;
+    float3 rf = r.d - in.n * r.d.dot(in.n) * 2;
+    rf.normalize_();
+    float3 pp = in.p; // - rf * CAMEPSILON;
     Ray rr(rf, pp);
 
     float3 acc(0., 0., 0.);
     ray_color(recursion_depth + 1, acc, rr, 0,
               SEPSILON, numeric_limits<double>::max());
-    clr += mat.i.pll_mul(acc) * in.n.dot(rf);
+    clr += mat.i.pll_mul(acc); // * in.n.dot(rf);
   }
 
   return RCLR_OK;
@@ -208,8 +209,9 @@ Camera::render()
 
       set_pixel(x, y, clr * (1. / SQ(NSAMPLE)));
 #else
-      Ray r = ray(x + 0.5, y + 0.5);
-      ray_color(r, clr, 0);
+//      Ray r = ray(x + 0.5, y + 0.5);
+      Ray r = ray(x, y);
+      ray_color(0, clr, r, 0, 0., numeric_limits<double>::max());
       set_pixel(x, y, clr);
 #endif
     }

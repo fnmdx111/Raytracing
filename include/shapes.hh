@@ -4,7 +4,7 @@
 #include "float3.hh"
 #include "objs.hh"
 
-#define SEPSILON 1e-3
+#define SEPSILON 1e-4
 
 class SSphere : public Shape
 {

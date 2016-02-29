@@ -15,7 +15,7 @@ class Scene;
 
 #define MAXRECUR 20
 
-#define CAMEPSILON -0.000001
+#define CAMEPSILON -0.00001
 
 class Camera
 {

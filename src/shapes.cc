@@ -30,7 +30,8 @@ SPlane::test_with(const Ray& r,
                   double t0, double t1) const
 {
   double denom = r.d.dot(this->n);
-  if (FEQ(denom, 0.0)) {
+//  if (FEQ(denom, 0.0)) {
+  if (denom >= 0.0) {
     return 0;
   }
 
