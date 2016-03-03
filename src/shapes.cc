@@ -1,7 +1,6 @@
 #include "float3.hh"
 #include "shapes.hh"
 #include <cmath>
-#include <cassert>
 
 using namespace std;
 
@@ -28,8 +27,6 @@ SPlane::test_with(const Ray& r,
                   Intersection& v,
                   double t0, double t1) const
 {
-//  assert(t0 > 0.);
-
   double denom = r.d.dot(this->n);
   if (FEQ(denom, 0.0)) {
     return false;
@@ -56,8 +53,6 @@ STriangle::test_with(const Ray& r,
                      Intersection& v,
                      double t0, double t1) const
 {
-//  assert(t0 > 0.);
-
 #define DEF(x, z) const double x = (z)
   DEF(a, pos1.x - pos2.x);
   DEF(b, pos1.y - pos2.y);
@@ -100,20 +95,6 @@ STriangle::test_with(const Ray& r,
   v = Intersection(t, SQ(t), p, this->n, this);
 
   return true;
-//  double t = (pos1 - r.p).dot(this->n) / r.d.dot(this->n);
-//  if (t < t0 || t > t1) {
-//    return 0;
-//  }
-//
-//  float3 p = r.p + r.d * t;
-//  if (((pos2 - pos1) * (p - pos1)).dot(this->n) > 0
-//      && ((pos3 - pos2) * (p - pos2)).dot(this->n) > 0
-//      && ((pos1 - pos3) * (p - pos3)).dot(this->n) > 0) {
-//    v.push_back(Intersection(t, SQ(t), p, this->n, this));
-//    return 1;
-//  } else {
-//    return 0;
-//  }
 }
 
 bool
@@ -121,8 +102,6 @@ SSphere::test_with(const Ray& r,
                    Intersection& v,
                    double t0, double t1) const
 {
-//  assert(t0 > 0.);
-
   float3 emc = r.p - this->pos;
 
   double ddotd = r.d.dot(r.d);

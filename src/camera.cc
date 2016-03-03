@@ -123,7 +123,6 @@ Camera::ray_color(int recursion_depth,
   }
 
   const Material& mat = *(in.sp->mat);
-  float3 nn = in.n;
 
   for (int k = 0; k < scene->lights.size(); ++k) {
     const Light& lgh = *(scene->lights[k]);
@@ -133,9 +132,7 @@ Camera::ray_color(int recursion_depth,
     } else {
       const float3 l = lgh.l(in);
 
-      float3 pp = in.p;
-
-      Ray sr(l, pp);
+      Ray sr(l, in.p);
       sr.type = 's';
 
       const double dist = lgh.dist(in);
@@ -145,13 +142,13 @@ Camera::ray_color(int recursion_depth,
 
       if (!sclr.is_zero()) {
         if (r.d.dot(in.n) > 0.) {
-          nn.negate();
+          in.n.negate();
         }
 
         float3 nd = r.d * -1;
-        mat.diffuse(accum, l, nn, nd, lgh.clr);
+        mat.diffuse(accum, l, in.n, nd, lgh.clr);
 
-        mat.specular(accum, l, nn, nd, lgh.clr);
+        mat.specular(accum, l, in.n, nd, lgh.clr);
       }
     }
   }
@@ -161,8 +158,7 @@ Camera::ray_color(int recursion_depth,
   } else {
     float3 rf = r.d - in.n * r.d.dot(in.n) * 2;
     rf.normalize_();
-    float3 pp = in.p;
-    Ray rr(rf, pp);
+    Ray rr(rf, in.p);
 
     float3 r_accum(0., 0., 0.);
     ray_color(recursion_depth + 1,
