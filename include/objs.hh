@@ -19,11 +19,13 @@ public:
 	   double ar, double air, double aig, double aib):
     d(float3(adr, adg, adb)), s(float3(asr, asg, asb)),
     i(float3(air, aig, aib)), r(ar) {}
+  ~Material() {}
 
-  float3 diffuse(const Light& lgh, const Intersection& in) const;
-  float3 specular(const Light& lgh, const Intersection& in,
-                               const float3& v) const;
-  float3 ambient(const Light& lgh) const;
+  void diffuse(float3& a, const float3& l, const float3& n, const float3& d,
+               const float3& clr) const;
+  void specular(float3& a, const float3& l, const float3& n, const float3& d,
+                const float3& clr) const;
+  void ambient(float3& a, const Light& lgh) const;
 };
 
 #include "lights.hh"
@@ -40,15 +42,17 @@ class Shape
   const static string __unknown;
 
 public:
+  virtual ~Shape() {}
+
   const Material* mat;
 
   void set_material(const Material* material) {
     mat = material;
   }
 
-  virtual int test_with(const Ray& r,
-												vector<Intersection>& v,
-                        double t0, double t1) const = 0;
+  virtual bool test_with(const Ray& r,
+                         Intersection& v,
+                         double t0, double t1) const = 0;
   virtual ShapeType type() const = 0;
   static const string& to_s(ShapeType s) {
     if (s == ShapeType::sphere) {
@@ -79,11 +83,7 @@ public:
     this->p.x = pp.x;
     this->p.y = pp.y;
     this->p.z = pp.z;
-  };
-
-  int test_with(const vector<Shape*>& shapes,
-                vector<Intersection>& is,
-                double t0, double t1) const;
+  }
 };
 
 #include "shapes.hh"
@@ -96,6 +96,7 @@ public:
   const Shape* sp;
   Intersection(double t, double t2, float3 p, float3 n, const Shape* sp):
     t(t), t2(t2), p(p), n(n), sp(sp) {}
+  Intersection(): t(0.0), t2(0.0), p(float3()), n(float3()), sp(0) {}
   Intersection& operator =(const Intersection& i);
 };
 

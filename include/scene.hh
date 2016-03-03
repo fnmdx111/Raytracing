@@ -20,6 +20,8 @@ public:
 			   materials(vector<Material*>())
   {
     parse(fn);
+    printf("Parsing done: %ld objects, %ld materials, %ld lights.\n",
+           shapes.size(), materials.size(), lights.size());
   }
 
 private:

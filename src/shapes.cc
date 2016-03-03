@@ -1,8 +1,7 @@
 #include "float3.hh"
 #include "shapes.hh"
 #include <cmath>
-#include <vector>
-
+#include <cassert>
 
 using namespace std;
 
@@ -24,40 +23,41 @@ SSphere::type() const
   return ShapeType::sphere;
 }
 
-int
+bool
 SPlane::test_with(const Ray& r,
-                  vector<Intersection>& v,
+                  Intersection& v,
                   double t0, double t1) const
 {
+//  assert(t0 > 0.);
+
   double denom = r.d.dot(this->n);
-//  if (FEQ(denom, 0.0)) {
-  if (denom >= 0.0) {
-    return 0;
+  if (FEQ(denom, 0.0)) {
+    return false;
   }
 
-  float3 nn = this->n;
-  if (denom > 0.0) {
-    nn *= -1;
-    denom *= -1;
+  double t = (r.p.dot(this->n) + this->d) / -denom;
+  if (t <= 0.) {
+    return false;
   }
 
-  double t = (r.p.dot(nn) + this->d) / -denom;
   if (t < t0 || t > t1) {
-    return 0;
+    return false;
   }
 
   float3 p = r.p + r.d * t;
 
-  v.push_back(Intersection(t, SQ(t),
-                           p, nn, this));
-  return 1;
+  v = Intersection(t, SQ(t), p, this->n, this);
+
+  return true;
 }
 
-int
+bool
 STriangle::test_with(const Ray& r,
-                     vector<Intersection>& v,
+                     Intersection& v,
                      double t0, double t1) const
 {
+//  assert(t0 > 0.);
+
 #define DEF(x, z) const double x = (z)
   DEF(a, pos1.x - pos2.x);
   DEF(b, pos1.y - pos2.y);
@@ -83,75 +83,81 @@ STriangle::test_with(const Ray& r,
 
   DEF(t, -(f * akmjb + e * jcmal + d * blmkc) / M);
   if (t < t0 || t > t1) {
-    return 0;
+    return false;
   }
 
   DEF(C, (i * akmjb + h * jcmal + g * blmkc) / M);
   if (C < 0 || C > 1) {
-    return 0;
+    return false;
   }
 
   DEF(B, (j * eimhf + k * gfmdi + l * dhmeg) / M);
   if (B < 0 || B > 1 - C) {
-    return 0;
+    return false;
   }
 
   float3 p = r.p + r.d * t;
-  v.push_back(Intersection(t, SQ(t), p, this->n, this));
+  v = Intersection(t, SQ(t), p, this->n, this);
 
-  return 1;
+  return true;
+//  double t = (pos1 - r.p).dot(this->n) / r.d.dot(this->n);
+//  if (t < t0 || t > t1) {
+//    return 0;
+//  }
+//
+//  float3 p = r.p + r.d * t;
+//  if (((pos2 - pos1) * (p - pos1)).dot(this->n) > 0
+//      && ((pos3 - pos2) * (p - pos2)).dot(this->n) > 0
+//      && ((pos1 - pos3) * (p - pos3)).dot(this->n) > 0) {
+//    v.push_back(Intersection(t, SQ(t), p, this->n, this));
+//    return 1;
+//  } else {
+//    return 0;
+//  }
 }
 
-int
+bool
 SSphere::test_with(const Ray& r,
-                   vector<Intersection>& v,
+                   Intersection& v,
                    double t0, double t1) const
 {
-  float3 delta = r.p - this->pos;
+//  assert(t0 > 0.);
+
+  float3 emc = r.p - this->pos;
 
   double ddotd = r.d.dot(r.d);
-  double ddotdd = r.d.dot(delta);
+  double ddotdd = r.d.dot(emc);
 
   double poly1 = -1 * ddotdd;
-  double poly2 = SQ(ddotdd) - ddotd * (delta.dot(delta) - SQ(this->r));
+  double poly2 = SQ(ddotdd) - ddotd * (emc.dot(emc) - SQ(this->r));
   if (poly2 < 0.) {
-    return 0;
-
-  } else if (FEQ(poly2, 0.0)) {
-    double t = poly1 / ddotd;
-    if (t < t0 || t > t1) {
-      return 0;
-    }
-
-    float3 pos = r.p + r.d * t;
-    v.push_back(Intersection(t, SQ(t),
-                             pos,
-                             (pos - this->pos) * (1 / this->r),
-                             this));
-
-    return 1;
+    return false;
 
   } else {
-    poly2 = -sqrt(poly2);
-    int count = 0;
-    REPEAT:
-    double t = (poly1 + poly2) / ddotd;
+    double sqrt_poly2 = sqrt(poly2);
+    double t = (poly1 + sqrt_poly2) / ddotd;
+    if (t < t0 && t > t1) {
+      t = numeric_limits<double>::max();
+    }
+
+    if (sqrt_poly2 > 0.) {
+      double tt = (poly1 - sqrt_poly2) / ddotd;
+      if (tt > t0 && tt < t1) {
+        if (tt < t) {
+          t = tt;
+        }
+      }
+    }
 
     if (t < t0 || t > t1) {
-      return count;
+      return false;
     }
-    ++count;
 
     float3 pos = r.p + r.d * t;
-    v.push_back(Intersection(t, SQ(t),
-                             pos,
-                             (pos - this->pos) * (1 / this->r),
-                             this));
-    if (poly2 > 0) {
-      return count;
-    }
+    v = Intersection(t, SQ(t), pos,
+                     (pos - this->pos) * (1 / this->r),
+                     this);
 
-    poly2 = -poly2;
-    goto REPEAT;
+    return true;
   }
 }

@@ -1,7 +1,6 @@
 #include "hw0.hh"
 #include "objs.hh"
 #include "lights.hh"
-#include <vector>
 #include <limits>
 #include "camera.hh"
 #include <chrono>
@@ -70,72 +69,71 @@ Camera::Camera(const Camera& other)
   copy(other);
 }
 
-#define RCLR_SHADOW_YES 0x80000001
-#define RCLR_SHADOW_NO 0x80000002
-#define RCLR_MAX_RECURSION 0x70000003
-#define RCLR_NO_INTERSECTION 0x70000004
-#define RCLR_INVALID_IDX 0x60000005
-#define RCLR_NO_IDEAL_SPECULAR 0x80000006
-#define RCLR_OK 0x80000000
-
-int
-Camera::ray_color(int recursion_depth, float3& clr, const Ray& r,
+void
+Camera::ray_color(int recursion_depth,
+                  float3& accum,
+                  const Ray& r,
                   const Light* shadow_lgh,
+                  const Shape* inv_shape,
                   double t0, double t1) const
 {
   if (recursion_depth > MAXRECUR) {
-    return RCLR_MAX_RECURSION;
+    return;
   }
 
-  vector<Intersection> ins;
+  Intersection ins;
 
   if (r.type == 's') { // is shadow ray
+    assert(inv_shape != 0);
+    assert(shadow_lgh != 0);
+
     for (int i = 0; i < scene->shapes.size(); ++i) {
-      if (scene->shapes[i]->test_with(r, ins, t0, t1) > 0) {
-        return RCLR_SHADOW_YES;
+      if (scene->shapes[i] == inv_shape) {
+        continue;
+      }
+      if (scene->shapes[i]->test_with(r, ins, t0, t1)) {
+        return;
       }
     }
 
-    assert(shadow_lgh != 0);
-    clr += shadow_lgh->clr;
-
-    return RCLR_SHADOW_NO;
+    accum += shadow_lgh->clr;
+    return;
   }
 
-  int count = r.test_with(scene->shapes, ins,
-                          t0, t1);
-  if (count <= 0) {
-    return RCLR_NO_INTERSECTION;
-  }
-
-  int idx = -1;
+  bool intersected = false;
+  Intersection in;
   double min_dist = numeric_limits<double>::max();
 
-  for (int k = 0; k < ins.size(); ++k) {
-    const double dist = pos.sq_dist(ins[k].p);
+  for (int i = 0; i < scene->shapes.size(); ++i) {
+    if (scene->shapes[i] == inv_shape) {
+      continue;
+    }
+    if (scene->shapes[i]->test_with(r, ins, t0, t1)) {
+      if (min_dist > ins.t) {
+        min_dist = ins.t;
 
-    if (min_dist > dist) {
-      idx = k;
-      min_dist = dist;
+        in = ins;
+        intersected = true;
+      }
     }
   }
 
-  if (idx < 0) {
-    return RCLR_INVALID_IDX;
+  if (!intersected) {
+    return;
   }
 
-  const Intersection& in = ins[idx];
   const Material& mat = *(in.sp->mat);
+  float3 nn = in.n;
 
   for (int k = 0; k < scene->lights.size(); ++k) {
     const Light& lgh = *(scene->lights[k]);
 
     if (lgh.type() == LightType::ambient) {
-      clr += mat.ambient(lgh);
+      mat.ambient(accum, lgh);
     } else {
-      float3 l = lgh.l(in);
+      const float3 l = lgh.l(in);
 
-      float3 pp = in.p; // + r.d * CAMEPSILON;
+      float3 pp = in.p;
 
       Ray sr(l, pp);
       sr.type = 's';
@@ -143,31 +141,38 @@ Camera::ray_color(int recursion_depth, float3& clr, const Ray& r,
       const double dist = lgh.dist(in);
 
       float3 sclr(0., 0., 0.);
-      ray_color(0, sclr, sr, &lgh, SEPSILON, dist);
+      ray_color(0, sclr, sr, &lgh, in.sp, SEPSILON, dist);
+
       if (!sclr.is_zero()) {
-        clr += mat.diffuse(lgh, in);
+        if (r.d.dot(in.n) > 0.) {
+          nn.negate();
+        }
 
         float3 nd = r.d * -1;
-        clr += mat.specular(lgh, in, nd);
+        mat.diffuse(accum, l, nn, nd, lgh.clr);
+
+        mat.specular(accum, l, nn, nd, lgh.clr);
       }
     }
   }
 
   if (mat.i.is_zero()) {
-    return RCLR_NO_IDEAL_SPECULAR;
+    return;
   } else {
     float3 rf = r.d - in.n * r.d.dot(in.n) * 2;
     rf.normalize_();
-    float3 pp = in.p; // - rf * CAMEPSILON;
+    float3 pp = in.p;
     Ray rr(rf, pp);
 
-    float3 acc(0., 0., 0.);
-    ray_color(recursion_depth + 1, acc, rr, 0,
-              SEPSILON, numeric_limits<double>::max());
-    clr += mat.i.pll_mul(acc); // * in.n.dot(rf);
+    float3 r_accum(0., 0., 0.);
+    ray_color(recursion_depth + 1,
+              r_accum,
+              rr, 0,
+              in.sp,
+              SEPSILON,
+              numeric_limits<double>::max());
+    accum += mat.i.pll_mul(r_accum);
   }
-
-  return RCLR_OK;
 }
 
 void
@@ -190,8 +195,8 @@ Camera::render()
   for (int x = 0; x < pw; ++x) {
     for (int y = 0; y < ph; ++y) {
 #ifdef PROGRESS
-      if (cnt % 50 == 0
-          && printf("\rRendered %0.03f%%", ((++cnt) / total) * 100.)) {
+      if (++cnt % 50 == 0
+          && printf("\rRendered %0.03f%%", (cnt / total) * 100.)) {
         ;
       }
 #endif
@@ -203,15 +208,15 @@ Camera::render()
           Ray r = ray(x + (p + dist(e2)) / NSAMPLE,
                       y + (q + dist(e2)) / NSAMPLE);
 
-          ray_color(0, clr, r, 0, 0., numeric_limits<double>::max());
+          ray_color(0, clr, r, 0, 0, 0., numeric_limits<double>::max());
         }
       }
 
       set_pixel(x, y, clr * (1. / SQ(NSAMPLE)));
 #else
-//      Ray r = ray(x + 0.5, y + 0.5);
+      // Ray r = ray(x + 0.5, y + 0.5);
       Ray r = ray(x, y);
-      ray_color(0, clr, r, 0, 0., numeric_limits<double>::max());
+      ray_color(0, clr, r, 0, 0, 0., numeric_limits<double>::max());
       set_pixel(x, y, clr);
 #endif
     }

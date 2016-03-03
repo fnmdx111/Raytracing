@@ -8,44 +8,39 @@ const string Shape::__triangle = "triangle";
 const string Shape::__plane = "plane";
 const string Shape::__unknown = "unknown";
 
-float3
-Material::ambient(const Light& lgh) const
+void
+Material::ambient(float3& a, const Light& lgh) const
 {
-  return this->d.pll_mul(lgh.clr);
+  a += this->d.pll_mul(lgh.clr);
 }
 
-float3
-Material::diffuse(const Light& lgh, const Intersection& in) const
+void
+Material::diffuse(float3& a,
+                  const float3& l,
+                  const float3& n,
+                  const float3& d,
+                  const float3& clr) const
 {
-  double d = in.n.dot(lgh.l(in));
-  d = max(0., d);
+  double sc_d = n.dot(l);
 
-  return this->d.pll_mul(lgh.clr) * d;
-}
-
-float3
-Material::specular(const Light& lgh, const Intersection& in,
-                   const float3& v) const
-{
-  double d = in.n.dot(bisector(v, lgh.l(in)));
-  d = max(0., d);
-  d = pow(d, this->r);
-
-  return this->s.pll_mul(lgh.clr) * d;
-}
-
-int
-Ray::test_with(const vector<Shape*>& shapes,
-               vector<Intersection>& is,
-               double t0, double t1) const
-{
-  int count = 0;
-
-  for (size_t i = 0; i < shapes.size(); ++i) {
-    count += shapes[i]->test_with(*this, is, t0, t1);
+  if (sc_d > 0.) {
+    a += this->d.pll_mul(clr) * sc_d;
   }
+}
 
-  return count;
+void
+Material::specular(float3& a,
+                   const float3& l,
+                   const float3& n,
+                   const float3& d,
+                   const float3& clr) const
+{
+  double sc_d = n.dot(bisector(d, l));
+
+  if (sc_d > 0.) {
+    sc_d = pow(sc_d, this->r);
+    a += this->s.pll_mul(clr) * sc_d;
+  }
 }
 
 Intersection&

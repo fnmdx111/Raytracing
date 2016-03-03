@@ -10,12 +10,12 @@ using namespace Imf;
 class Scene;
 
 #ifdef FEAT_ANTIALIASING
-#define NSAMPLE 6
+#define NSAMPLE 4
 #endif
 
-#define MAXRECUR 20
+#define MAXRECUR 10
 
-#define CAMEPSILON -0.00001
+#define CAMEPSILON -0.001
 
 class Camera
 {
@@ -59,11 +59,12 @@ public:
   inline void accum_pixel(int i, int j, const float3& rgb);
   inline void set_pixel(int i, int j, const float3& rgb);
 
-  int ray_color(int recursion_depth,
-                 float3& clr,
-                 const Ray& r,
-                 const Light* shadow_lgh,
-                 double t0, double t1) const;
+  void ray_color(int recursion_depth,
+                   float3& ret,
+                   const Ray& r,
+                   const Light* shadow_lgh,
+                   const Shape* inv_shape,
+                   double t0, double t1) const;
 
   void render();
   void save(const string& s) const;

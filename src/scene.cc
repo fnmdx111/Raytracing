@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include <tuple>
 
 #include "lights.hh"
 #include "objs.hh"
@@ -45,6 +46,54 @@ get_token_as_float(string in, int which)
   return this_float;
 }
 
+void read_wavefront_file(const string& file,
+                         vector<tuple<int, int, int>>& tris,
+                         vector<tuple<double, double, double>>& verts)
+{
+  // clear out the tris and verts vectors:
+  tris.clear();
+  verts.clear();
+
+  ifstream in(file);
+  char buffer[1025];
+  string cmd;
+
+  for (int line = 1; in.good(); ++line) {
+    in.getline(buffer, 1024);
+    buffer[in.gcount()] = 0;
+    cmd = "";
+
+    istringstream iss(buffer);
+
+    iss >> cmd;
+    if (cmd[0] == '#' or cmd.empty()) {
+      // ignore comments or blank lines
+      continue;
+    } else if (cmd == "v") {
+      // got a vertex:
+      // read in the parameters:
+      double pa, pb, pc;
+      iss >> pa >> pb >> pc;
+      verts.push_back(tuple<double, double, double>(pa, pb, pc));
+    } else if (cmd == "f") {
+      // got a face (triangle)
+
+      // read in the parameters:
+      int i, j, k;
+      iss >> i >> j >> k;
+      // vertex numbers in OBJ files start with 1, but in C++ array
+      // indices start with 0, so we're shifting everything down by
+      // 1
+      tris.push_back(tuple<int, int, int>(i - 1, j - 1, k - 1));
+    } else {
+      std::cerr << "Parser error: invalid command at line "
+      << line << std::endl;
+    }
+  }
+
+  in.close();
+}
+
 void
 Scene::parse(const string& filename)
 {
@@ -74,6 +123,32 @@ Scene::parse(const string& filename)
     } while (0)
 
     switch (line[0]) {
+    case 'w': {
+      vector<tuple<int, int, int>> tris;
+      vector<tuple<double, double, double>> verts;
+      read_wavefront_file(line.substr(2), tris, verts);
+
+      for (int _i = 0; _i < tris.size(); ++_i) {
+        const auto& tri = tris[_i];
+#define G0(t) get<0>(t)
+#define G1(t) get<1>(t)
+#define G2(t) get<2>(t)
+        STriangle* t = new STriangle(G0(verts[G0(tri)]),
+                                     G1(verts[G0(tri)]),
+                                     G2(verts[G0(tri)]),
+                                     G0(verts[G1(tri)]),
+                                     G1(verts[G1(tri)]),
+                                     G2(verts[G1(tri)]),
+                                     G0(verts[G2(tri)]),
+                                     G1(verts[G2(tri)]),
+                                     G2(verts[G2(tri)]));
+        t->set_material(last_material);
+        objs.push_back(t);
+      }
+
+      break;
+    }
+
     case 's': {
       double x, y, z, r;
       get_float(x);

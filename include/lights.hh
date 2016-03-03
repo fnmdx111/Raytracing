@@ -11,6 +11,7 @@ class Light
 public:
 
   float3 clr;
+  virtual ~Light() {}
   virtual float3 l(const Intersection& in) const = 0;
   virtual LightType type() const = 0;
   virtual double dist(const Intersection& in) const = 0;

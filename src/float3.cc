@@ -7,11 +7,11 @@ using namespace std;
 #define SQ(x) ((x) * (x))
 
 bool
-float3::operator ==(const float3& y) const
+float3::operator ==(const float3& o) const
 {
-  if (FEQ(this->x, y.x)
-      && FEQ(this->y, y.y)
-      && FEQ(this->z, y.z)) {
+  if (FEQ(this->x, o.x)
+      && FEQ(this->y, o.y)
+      && FEQ(this->z, o.z)) {
     return true;
   } else {
     return false;
@@ -19,36 +19,36 @@ float3::operator ==(const float3& y) const
 }
 
 float3
-float3::operator +(const float3& y) const
+float3::operator +(const float3& o) const
 {
-  return float3(this->x + y.x,
-		this->y + y.y,
-		this->z + y.z);
+  return float3(this->x + o.x,
+                this->y + o.y,
+                this->z + o.z);
 }
 
 float3
-float3::operator -(const float3& y) const
+float3::operator -(const float3& o) const
 {
-  return float3(this->x - y.x,
-		this->y - y.y,
-		this->z - y.z);
+  return float3(this->x - o.x,
+                this->y - o.y,
+                this->z - o.z);
 }
 
 float3
-float3::operator *(const float3& y) const
+float3::operator *(const float3& o) const
 {
   double u1 = this->x, u2 = this->y, u3 = this->z;
-  double v1 = y.x, v2 = y.y, v3 = y.z;
+  double v1 = o.x, v2 = o.y, v3 = o.z;
 
   return float3(u2 * v3 - u3 * v2,
-		u3 * v1 - u1 * v3,
-		u1 * v2 - u2 * v1);
+                u3 * v1 - u1 * v3,
+                u1 * v2 - u2 * v1);
 }
 
 float3&
-float3::operator *=(const float3& y)
+float3::operator *=(const float3& o)
 {
-  float3 z = *this * y;
+  float3 z = *this * o;
   this->x = z.x;
   this->y = z.y;
   this->z = z.z;
@@ -111,7 +111,7 @@ float3::operator *=(double y)
 double
 float3::norm() const
 {
-  return sqrt(SQ(this->x) + SQ(this->y) +SQ(this->z));
+  return sqrt(SQ(this->x) + SQ(this->y) + SQ(this->z));
 }
 
 bool

@@ -4,7 +4,7 @@
 #include "float3.hh"
 #include "objs.hh"
 
-#define SEPSILON 1e-4
+#define SEPSILON 1e-7
 
 class SSphere : public Shape
 {
@@ -14,8 +14,8 @@ public:
 
   SSphere(double x, double y, double z, double r): pos(float3(x, y, z)), r(r) {}
 
-  int test_with(const Ray& r,
-                vector<Intersection>& v,
+  bool test_with(const Ray& r,
+                Intersection& v,
                 double t0, double t1) const;
   ShapeType type() const;
 };
@@ -36,8 +36,8 @@ public:
     n = ((pos1 - pos2) * (pos1 - pos3)).normalize();
   }
 
-  int test_with(const Ray& r,
-                vector<Intersection>& v,
+  bool test_with(const Ray& r,
+                Intersection& v,
                 double t0, double t1) const;
   ShapeType type() const;
 };
@@ -51,8 +51,8 @@ public:
   SPlane(double nx, double ny, double nz, double d):
     n(float3(nx, ny, nz)), d(d) {}
 
-  int test_with(const Ray& r,
-                vector<Intersection>& v,
+  bool test_with(const Ray& r,
+                Intersection& v,
                 double t0, double t1) const;
   ShapeType type() const;
 };
