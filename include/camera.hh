@@ -63,7 +63,6 @@ public:
                    float3& ret,
                    const Ray& r,
                    const Light* shadow_lgh,
-                   const Shape* inv_shape,
                    double t0, double t1) const;
 
   void render();

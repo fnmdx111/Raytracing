@@ -4,12 +4,16 @@
 
 using namespace std;
 
+int opmode = 0;
+
 int
 main(int argc, char** argv)
 {
   if (argc < 3) {
     cout << "usage: scene-file output-path" << endl;
     return -1;
+  } else if (argc == 4) {
+    opmode = atoi(argv[3]);
   }
 
   Scene scene((string(argv[1])));

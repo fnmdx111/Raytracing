@@ -13,8 +13,8 @@ using namespace std;
 Ray
 Camera::ray(double i, double j)
 {
-  double su = this->l + (this->r - this->l) * (i + 0.5) / this->pw;
-  double sv = this->b + (this->t - this->b) * (j + 0.5) / this->ph;
+  double su = this->l + (this->r - this->l) * i / this->pw;
+  double sv = this->b + (this->t - this->b) * j / this->ph;
 
   float3 dir = this->dir * this->d + this->u * su + this->v * sv;
   dir.normalize_();
@@ -74,7 +74,6 @@ Camera::ray_color(int recursion_depth,
                   float3& accum,
                   const Ray& r,
                   const Light* shadow_lgh,
-                  const Shape* inv_shape,
                   double t0, double t1) const
 {
   if (recursion_depth > MAXRECUR) {
@@ -84,13 +83,11 @@ Camera::ray_color(int recursion_depth,
   Intersection ins;
 
   if (r.type == 's') { // is shadow ray
-    assert(inv_shape != 0);
     assert(shadow_lgh != 0);
 
+//    t0 = t0 < SEPSILON ? SEPSILON : t0;
+
     for (int i = 0; i < scene->shapes.size(); ++i) {
-      if (scene->shapes[i] == inv_shape) {
-        continue;
-      }
       if (scene->shapes[i]->test_with(r, ins, t0, t1)) {
         return;
       }
@@ -105,9 +102,6 @@ Camera::ray_color(int recursion_depth,
   double min_dist = numeric_limits<double>::max();
 
   for (int i = 0; i < scene->shapes.size(); ++i) {
-    if (scene->shapes[i] == inv_shape) {
-      continue;
-    }
     if (scene->shapes[i]->test_with(r, ins, t0, t1)) {
       if (min_dist > ins.t) {
         min_dist = ins.t;
@@ -120,6 +114,10 @@ Camera::ray_color(int recursion_depth,
 
   if (!intersected) {
     return;
+  }
+
+  if (r.d.dot(in.n) > 0.) {
+    in.n.negate();
   }
 
   const Material& mat = *(in.sp->mat);
@@ -135,16 +133,10 @@ Camera::ray_color(int recursion_depth,
       Ray sr(l, in.p);
       sr.type = 's';
 
-      const double dist = lgh.dist(in);
-
       float3 sclr(0., 0., 0.);
-      ray_color(0, sclr, sr, &lgh, in.sp, SEPSILON, dist);
+      ray_color(0, sclr, sr, &lgh, SEPSILON, in.t);
 
       if (!sclr.is_zero()) {
-        if (r.d.dot(in.n) > 0.) {
-          in.n.negate();
-        }
-
         float3 nd = r.d * -1;
         mat.diffuse(accum, l, in.n, nd, lgh.clr);
 
@@ -164,7 +156,6 @@ Camera::ray_color(int recursion_depth,
     ray_color(recursion_depth + 1,
               r_accum,
               rr, 0,
-              in.sp,
               SEPSILON,
               numeric_limits<double>::max());
     accum += mat.i.pll_mul(r_accum);
@@ -204,15 +195,15 @@ Camera::render()
           Ray r = ray(x + (p + dist(e2)) / NSAMPLE,
                       y + (q + dist(e2)) / NSAMPLE);
 
-          ray_color(0, clr, r, 0, 0, 0., numeric_limits<double>::max());
+          ray_color(0, clr, r, 0, 0., numeric_limits<double>::max());
         }
       }
 
       set_pixel(x, y, clr * (1. / SQ(NSAMPLE)));
 #else
-      // Ray r = ray(x + 0.5, y + 0.5);
-      Ray r = ray(x, y);
-      ray_color(0, clr, r, 0, 0, 0., numeric_limits<double>::max());
+      Ray r = ray(x + 0.5, y + 0.5);
+      // Ray r = ray(x, y);
+      ray_color(0, clr, r, 0, 0., numeric_limits<double>::max());
       set_pixel(x, y, clr);
 #endif
     }

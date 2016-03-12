@@ -32,6 +32,26 @@ public:
 
 class Ray;
 
+class AABoundingBox {
+public:
+  double xmin, xmax;
+  double ymin, ymax;
+  double zmin, zmax;
+  AABoundingBox(double xmi, double xma,
+                double ymi, double yma,
+                double zmi, double zma): xmin(xmi), xmax(xma),
+  ymin(ymi), ymax(yma), zmin(zmi), zmax(zma) {}
+
+  AABoundingBox()
+  {
+    xmin = xmax = ymin = ymax = zmin = zmax = numeric_limits<double>::max();
+  }
+
+  bool test_with(const Ray& r,
+                 Intersection& v,
+                 double t0, double t1) const;
+};
+
 enum ShapeType { sphere, triangle, plane };
 
 class Shape
@@ -42,11 +62,16 @@ class Shape
   const static string __unknown;
 
 public:
+  Shape() {}
   virtual ~Shape() {}
+
+  AABoundingBox aabb;
 
   const Material* mat;
 
-  void set_material(const Material* material) {
+  void
+  set_material(const Material* material)
+  {
     mat = material;
   }
 
@@ -54,7 +79,9 @@ public:
                          Intersection& v,
                          double t0, double t1) const = 0;
   virtual ShapeType type() const = 0;
-  static const string& to_s(ShapeType s) {
+  static const
+  string& to_s(ShapeType s)
+  {
     if (s == ShapeType::sphere) {
       return Shape::__sphere;
     } else if (s == ShapeType::triangle) {
