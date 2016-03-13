@@ -225,7 +225,12 @@ Camera::render()
 #ifdef PROGRESS
   printf(".\n");
 #endif
-  printf("Done in %lld seconds.\n",
+  printf(
+#if defined(__clang__)
+         "Done in %lld seconds.\n",
+#else
+         "Done in %ld seconds.\n",
+#endif
          chrono::duration_cast<chrono::seconds>(end - begin).count());
 }
 

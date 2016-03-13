@@ -1,6 +1,5 @@
 #include "scene.hh"
 
-#include <cmath>
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -8,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <tuple>
+#include <algorithm>
 
 #include "lights.hh"
 #include "objs.hh"

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <cmath>
+#include <limits>
 
 struct float3
 {
