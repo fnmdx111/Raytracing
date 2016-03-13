@@ -11,10 +11,10 @@
 using namespace std;
 
 Ray
-Camera::ray(double i, double j)
+Camera::ray(double i, double j) const
 {
   double su = this->l + (this->r - this->l) * i / this->pw;
-  double sv = this->b + (this->t - this->b) * j / this->ph;
+  double sv = this->t + (this->b - this->t) * j / this->ph;
 
   float3 dir = this->dir * this->d + this->u * su + this->v * sv;
   dir.normalize_();
@@ -26,7 +26,7 @@ Camera::ray(double i, double j)
 inline void
 Camera::accum_pixel(int i, int j, const float3& rgba)
 {
-  int nj = ph - j - 1;
+  int nj = j; // ph - j - 1;
   pixels[nj][i].r += rgba.x;
   pixels[nj][i].g += rgba.y;
   pixels[nj][i].b += rgba.z;
@@ -35,7 +35,7 @@ Camera::accum_pixel(int i, int j, const float3& rgba)
 inline void
 Camera::set_pixel(int i, int j, const float3& rgb)
 {
-  int nj = ph - j - 1;
+  int nj = j; // ph - j - 1;
   pixels[nj][i].r = rgb.x;
   pixels[nj][i].g = rgb.y;
   pixels[nj][i].b = rgb.z;
@@ -69,6 +69,7 @@ Camera::Camera(const Camera& other)
   copy(other);
 }
 
+extern int opmode;
 void
 Camera::ray_color(int recursion_depth,
                   float3& accum,
@@ -85,11 +86,15 @@ Camera::ray_color(int recursion_depth,
   if (r.type == 's') { // is shadow ray
     assert(shadow_lgh != 0);
 
-//    t0 = t0 < SEPSILON ? SEPSILON : t0;
-
-    for (int i = 0; i < scene->shapes.size(); ++i) {
-      if (scene->shapes[i]->test_with(r, ins, t0, t1)) {
+    if (opmode == 2 || opmode == 3) {
+      if (scene->root->test_with(r, ins, t0, t1)) {
         return;
+      }
+    } else {
+      for (int i = 0; i < scene->shapes.size(); ++i) {
+        if (scene->shapes[i]->test_with(r, ins, t0, t1)) {
+          return;
+        }
       }
     }
 
@@ -97,17 +102,21 @@ Camera::ray_color(int recursion_depth,
     return;
   }
 
-  bool intersected = false;
   Intersection in;
-  double min_dist = numeric_limits<double>::max();
+  bool intersected = false;
+  if (opmode == 2 || opmode == 3) {
+    intersected = scene->root->test_with(r, in, t0, t1);
+  } else {
+    double min_dist = numeric_limits<double>::max();
 
-  for (int i = 0; i < scene->shapes.size(); ++i) {
-    if (scene->shapes[i]->test_with(r, ins, t0, t1)) {
-      if (min_dist > ins.t) {
-        min_dist = ins.t;
+    for (int i = 0; i < scene->shapes.size(); ++i) {
+      if (scene->shapes[i]->test_with(r, ins, t0, t1)) {
+        if (min_dist > ins.t) {
+          min_dist = ins.t;
 
-        in = ins;
-        intersected = true;
+          in = ins;
+          intersected = true;
+        }
       }
     }
   }
@@ -128,13 +137,16 @@ Camera::ray_color(int recursion_depth,
     if (lgh.type() == LightType::ambient) {
       mat.ambient(accum, lgh);
     } else {
-      const float3 l = lgh.l(in);
+      float3 l = lgh.l(in);
 
+      const double shadow_t = l.norm();
+      l.normalize_();
       Ray sr(l, in.p);
+
       sr.type = 's';
 
       float3 sclr(0., 0., 0.);
-      ray_color(0, sclr, sr, &lgh, SEPSILON, in.t);
+      ray_color(0, sclr, sr, &lgh, SEPSILON, shadow_t);
 
       if (!sclr.is_zero()) {
         float3 nd = r.d * -1;
@@ -179,8 +191,8 @@ Camera::render()
   double total = pw * ph;
   long cnt = 0;
 #endif
-  for (int x = 0; x < pw; ++x) {
-    for (int y = 0; y < ph; ++y) {
+  for (int y = 0; y < ph; ++y) {
+    for (int x = 0; x < pw; ++x) {
 #ifdef PROGRESS
       if (++cnt % 50 == 0
           && printf("\rRendered %0.03f%%", (cnt / total) * 100.)) {

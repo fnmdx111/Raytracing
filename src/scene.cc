@@ -14,6 +14,152 @@
 
 using namespace std;
 
+ShapeType
+BVHNode::type() const
+{
+  return ShapeType::bvhnode;
+}
+
+bool
+BVHNode::test_with(const Ray &r, Intersection &v, double t0, double t1) const
+{
+  if (shape != 0) {
+    bool intersected = shape->test_with(r, v, t0, t1);
+    if (intersected) {
+      v.sp = shape;
+    }
+
+    return intersected;
+  } else if (shape == 0 && aabb.test_with(r, v, t0, t1)) {
+    Intersection itsl, itsr;
+
+    bool left_hit = (chl != 0) && chl->test_with(r, itsl, t0, t1);
+    bool right_hit = (chr != 0) && chr->test_with(r, itsr, t0, t1);
+
+    if (left_hit && right_hit) {
+      if (itsl.t < itsr.t) {
+        v = itsl;
+      } else {
+        v = itsr;
+      }
+      return true;
+    } else if (left_hit) {
+      v = itsl;
+      return true;
+    } else if (right_hit) {
+      v = itsr;
+      return true;
+    }
+
+    return false;
+  }
+
+  return false;
+}
+
+inline double
+midpoint_by_axis(const Shape* s, int axis)
+{
+  switch (axis) {
+  case 0:
+    return (s->aabb.xmax + s->aabb.xmin) / 2;
+
+  case 1:
+    return (s->aabb.ymax + s->aabb.ymin) / 2;
+
+  case 2:
+    return (s->aabb.zmax + s->aabb.zmin) / 2;
+
+  default:
+      return 0.0;
+  }
+}
+
+size_t
+partition_by_axis(vector<Shape*>& shapes, size_t h, size_t t, int axis)
+{
+  const Shape* pivot = shapes[t];
+  const double pivot_midpoint = midpoint_by_axis(pivot, axis);
+
+  size_t store_idx = h;
+
+  for (size_t cmp_idx = h; cmp_idx < t - 1; ++cmp_idx) {
+    if (midpoint_by_axis(shapes[cmp_idx], axis) < pivot_midpoint) {
+      Shape* temp = shapes[cmp_idx];
+      shapes[cmp_idx] = shapes[store_idx];
+      shapes[store_idx] = temp;
+
+      ++store_idx;
+    }
+  }
+
+  Shape* temp = shapes[t];
+  shapes[t] = shapes[h];
+  shapes[h] = temp;
+
+  return store_idx;
+}
+
+size_t
+quickselect(vector<Shape*>& shapes, size_t h, size_t t, size_t k, int axis)
+{
+  while (h < t) {
+    size_t mid = partition_by_axis(shapes, h, t, axis);
+    if (mid == k) {
+      return mid;
+    } else if (mid < k) {
+      h = mid + 1;
+    } else {
+      t = mid - 1;
+    }
+  }
+
+  return h;
+}
+
+size_t
+quickselect1(vector<Shape*>& shapes, size_t h, size_t t, size_t k, int axis)
+{
+  sort(shapes.begin() + h, shapes.begin() + t,
+       [axis](const Shape* s1, const Shape* s2) {
+         return midpoint_by_axis(s1, axis) < midpoint_by_axis(s2, axis);
+       });
+
+  return k;
+}
+
+void
+build(vector<Shape*>& shapes, size_t h, size_t t,
+      BVHNode* current, int axis)
+{
+  if (h == t) {
+    current->shape = shapes[h];
+    current->aabb.copy_from(shapes[h]->aabb);
+  } else {
+    size_t mid_idx = quickselect1(shapes, h, t, (h + t) / 2, axis);
+
+    if (h <= mid_idx) {
+      current->chl = new BVHNode(0);
+      build(shapes, h, mid_idx, current->chl, (axis + 1) % 3);
+    }
+
+    if (mid_idx + 1 <= t) {
+      current->chr = new BVHNode(0);
+      build(shapes, mid_idx + 1, t, current->chr, (axis + 1) % 3);
+    }
+
+    current->aabb.copy_from(current->chl->aabb + current->chr->aabb);
+  }
+}
+
+void
+Scene::build_tree()
+{
+  printf("Building BVH tree...\n");
+  build(shapes, 0, shapes.size() - 1, root, 0);
+  printf("Building BVH tree done.\n");
+}
+
 double
 get_token_as_float(string in, int which)
 {

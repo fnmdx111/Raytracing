@@ -44,7 +44,25 @@ public:
 
   AABoundingBox()
   {
-    xmin = xmax = ymin = ymax = zmin = zmax = numeric_limits<double>::max();
+    xmax = ymax = zmax = numeric_limits<double>::max();
+    xmin = ymin = zmin = -numeric_limits<double>::max();
+  }
+
+  void copy_from(const AABoundingBox& other)
+  {
+    xmin = other.xmin;
+    xmax = other.xmax;
+    ymin = other.ymin;
+    ymax = other.ymax;
+    zmin = other.zmin;
+    zmax = other.zmax;
+  }
+
+  AABoundingBox operator +(const AABoundingBox& other)
+  {
+    return AABoundingBox(min(xmin, other.xmin), max(xmax, other.xmax),
+                         min(ymin, other.ymin), max(ymax, other.ymax),
+                         min(zmin, other.zmin), max(zmax, other.zmax));
   }
 
   bool test_with(const Ray& r,
@@ -52,13 +70,14 @@ public:
                  double t0, double t1) const;
 };
 
-enum ShapeType { sphere, triangle, plane };
+enum ShapeType { sphere, triangle, plane, bvhnode };
 
 class Shape
 {
   const static string __sphere;
   const static string __triangle;
   const static string __plane;
+  const static string __bvhnode;
   const static string __unknown;
 
 public:
@@ -88,6 +107,8 @@ public:
       return Shape::__triangle;
     } else if (s == ShapeType::plane) {
       return Shape::__plane;
+    } else if (s == ShapeType::bvhnode) {
+      return Shape::__bvhnode;
     }
     return Shape::__unknown;
   }

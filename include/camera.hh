@@ -54,7 +54,7 @@ public:
 
   Camera(const Camera& cam);
 
-  Ray ray(double i, double j);
+  Ray ray(double i, double j) const;
   void copy(const Camera& other);
   inline void accum_pixel(int i, int j, const float3& rgb);
   inline void set_pixel(int i, int j, const float3& rgb);

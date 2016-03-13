@@ -122,11 +122,6 @@ AABoundingBox::test_with(const Ray& r, Intersection& v,
     return false;
   }
 
-#define UPDATE_INTERSECTION do {\
-          v.t = tnear;\
-          v.t2 = SQ(tnear);\
-          v.p = r.p + r.d * tnear;\
-        } while (0)
   if (opmode == 1 || opmode == 2) {
     switch (which_normal) {
     case 'x':
@@ -145,7 +140,9 @@ AABoundingBox::test_with(const Ray& r, Intersection& v,
       break;
     }
 
-    UPDATE_INTERSECTION;
+    v.t = tnear;
+    v.t2 = SQ(tnear);
+    v.p = r.p + r.d * tnear;
   }
 
   return true;

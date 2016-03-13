@@ -6,7 +6,7 @@ using namespace std;
 float3
 LPoint::l(const Intersection& in) const
 {
-  return (this->pos - in.p).normalize();
+  return this->pos - in.p;
 }
 
 float3
