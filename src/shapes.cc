@@ -2,8 +2,6 @@
 #include "shapes.hh"
 #include <cmath>
 
-extern int opmode;
-
 using namespace std;
 
 ShapeType
@@ -55,20 +53,11 @@ STriangle::test_with(const Ray& r,
                      Intersection& v,
                      double t0, double t1) const
 {
-  if (opmode == 1 || opmode == 2) {
-    bool intersected = aabb.test_with(r, v, t0, t1);
 
-    if (intersected) {
-      v.sp = this;
-      return true;
-    }
+  bool intersected = aabb.test_with(r, v, t0, t1);
+
+  if (!intersected) {
     return false;
-  } else {
-    bool intersected = aabb.test_with(r, v, t0, t1);
-
-    if (!intersected) {
-      return false;
-    }
   }
 
 #define DEF(x, z) const double x = (z)
@@ -120,20 +109,10 @@ SSphere::test_with(const Ray& r,
                    Intersection& v,
                    double t0, double t1) const
 {
-  if (opmode == 1 || opmode == 2) {
-    bool intersected = aabb.test_with(r, v, t0, t1);
+  bool intersected = aabb.test_with(r, v, t0, t1);
 
-    if (intersected) {
-      v.sp = this;
-      return true;
-    }
-    return false;
-  } else {
-    bool intersected = aabb.test_with(r, v, t0, t1);
-
-    if (!intersected) {
+  if (!intersected) {
       return false;
-    }
   }
 
   float3 emc = r.p - this->pos;

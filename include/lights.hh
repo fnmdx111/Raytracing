@@ -3,8 +3,9 @@
 
 #include "float3.hh"
 #include "objs.hh"
+#include <random>
 
-enum LightType { point, directional, ambient };
+enum LightType { point, directional, ambient, area };
 
 class Light
 {
@@ -28,6 +29,33 @@ public:
   float3 l(const Intersection& in) const;
   LightType type() const;
   double dist(const Intersection& in) const;
+};
+
+class LArea : public Light
+{
+public:
+  float3 pos, n, u, v;
+  double len;
+
+  std::random_device rd;
+  std::mt19937 e2;
+  std::uniform_real_distribution<> dst;
+
+  LArea(double px, double py, double pz, double nx, double ny, double nz,
+        double ux, double uy, double uz, double len, double r, double b,
+        double g): Light(r, g, b), pos(float3(px, py, pz)), n(nx, ny, nz),
+  u(ux, uy, uz), len(len),
+  e2(std::mt19937(rd())),
+  dst(std::uniform_real_distribution<>(0.0, 0.99999999))
+  {
+    v = u * n;
+    v.normalize_();
+  }
+
+  float3 l(const Intersection& in) const;
+  LightType type() const;
+  double dist(const Intersection& in) const;
+  float3 l(const Intersection& in, double su, double sv) const;
 };
 
 class LDirectional : public Light

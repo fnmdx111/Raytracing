@@ -56,7 +56,6 @@ Intersection::operator =(const Intersection& i)
   return *this;
 }
 
-extern int opmode;
 static const float3 axis_x = float3(1.0, 0.0, 0.0);
 static const float3 axis_y = float3(0.0, 1.0, 0.0);
 static const float3 axis_z = float3(0.0, 0.0, 1.0);
@@ -120,29 +119,6 @@ AABoundingBox::test_with(const Ray& r, Intersection& v,
   tfar = min(tfar, tzmax);
   if (tnear > tfar) {
     return false;
-  }
-
-  if (opmode == 1 || opmode == 2) {
-    switch (which_normal) {
-    case 'x':
-      v.n = axis_x;
-      break;
-
-    case 'y':
-      v.n = axis_y;
-      break;
-
-    case 'z':
-      v.n = axis_z;
-      break;
-
-    default:
-      break;
-    }
-
-    v.t = tnear;
-    v.t2 = SQ(tnear);
-    v.p = r.p + r.d * tnear;
   }
 
   return true;

@@ -11,7 +11,7 @@
 using namespace std;
 
 Ray
-Camera::ray(double i, double j) const
+Camera::ray(double i, double j)
 {
   double su = this->l + (this->r - this->l) * i / this->pw;
   double sv = this->t + (this->b - this->t) * j / this->ph;
@@ -69,7 +69,29 @@ Camera::Camera(const Camera& other)
   copy(other);
 }
 
-extern int opmode;
+void
+do_shadow(const Camera& cam, float3& accum, const Ray& r, const Light& lgh,
+          float3& l, const Intersection& in)
+{
+
+  const double shadow_t = l.norm();
+  l.normalize_();
+  Ray sr(l, in.p);
+
+  sr.type = 's';
+
+  float3 sclr(0., 0., 0.);
+  cam.ray_color(0, sclr, sr, &lgh, SEPSILON, shadow_t);
+
+  if (!sclr.is_zero()) {
+    float3 nd = r.d * -1;
+    in.sp->mat->diffuse(accum, l, in.n, nd, lgh.clr);
+
+    in.sp->mat->specular(accum, l, in.n, nd, lgh.clr);
+  }
+}
+
+extern int SHDNSAMPLE;
 void
 Camera::ray_color(int recursion_depth,
                   float3& accum,
@@ -81,21 +103,12 @@ Camera::ray_color(int recursion_depth,
     return;
   }
 
-  Intersection ins;
-
   if (r.type == 's') { // is shadow ray
     assert(shadow_lgh != 0);
 
-    if (opmode == 2 || opmode == 3) {
-      if (scene->root->test_with(r, ins, t0, t1)) {
-        return;
-      }
-    } else {
-      for (int i = 0; i < scene->shapes.size(); ++i) {
-        if (scene->shapes[i]->test_with(r, ins, t0, t1)) {
-          return;
-        }
-      }
+    Intersection ins;
+    if (scene->root->test_with(r, ins, t0, t1)) {
+      return;
     }
 
     accum += shadow_lgh->clr;
@@ -104,22 +117,7 @@ Camera::ray_color(int recursion_depth,
 
   Intersection in;
   bool intersected = false;
-  if (opmode == 2 || opmode == 3) {
-    intersected = scene->root->test_with(r, in, t0, t1);
-  } else {
-    double min_dist = numeric_limits<double>::max();
-
-    for (int i = 0; i < scene->shapes.size(); ++i) {
-      if (scene->shapes[i]->test_with(r, ins, t0, t1)) {
-        if (min_dist > ins.t) {
-          min_dist = ins.t;
-
-          in = ins;
-          intersected = true;
-        }
-      }
-    }
-  }
+  intersected = scene->root->test_with(r, in, t0, t1);
 
   if (!intersected) {
     return;
@@ -136,24 +134,31 @@ Camera::ray_color(int recursion_depth,
 
     if (lgh.type() == LightType::ambient) {
       mat.ambient(accum, lgh);
+    } else if (lgh.type() == LightType::area) {
+      LArea* la = dynamic_cast<LArea*>(scene->lights[k]);
+
+      float3 ll = la->l(in);
+      if (ll.dot(la->n) > 0.0) {
+        // The normal of the area light is in the same direction of the ray from
+        // intersection to the position of this area light.
+        continue;
+      }
+
+      for (int rdi = 0; rdi < SQ(SHDNSAMPLE); ++rdi) {
+        double ru = la->dst(la->e2);
+        double rv = la->dst(la->e2);
+        float3 l = la->l(in, ru, rv);
+
+        float3 shd_accum;
+        do_shadow(*this, shd_accum, r, lgh, l, in);
+        shd_accum *= in.n.dot(l);
+        accum += shd_accum * (1. / SQ(SHDNSAMPLE));
+      }
+
     } else {
       float3 l = lgh.l(in);
 
-      const double shadow_t = l.norm();
-      l.normalize_();
-      Ray sr(l, in.p);
-
-      sr.type = 's';
-
-      float3 sclr(0., 0., 0.);
-      ray_color(0, sclr, sr, &lgh, SEPSILON, shadow_t);
-
-      if (!sclr.is_zero()) {
-        float3 nd = r.d * -1;
-        mat.diffuse(accum, l, in.n, nd, lgh.clr);
-
-        mat.specular(accum, l, in.n, nd, lgh.clr);
-      }
+      do_shadow(*this, accum, r, lgh, l, in);
     }
   }
 
@@ -174,6 +179,8 @@ Camera::ray_color(int recursion_depth,
   }
 }
 
+extern int NSAMPLE;
+
 void
 Camera::render()
 {
@@ -181,27 +188,13 @@ Camera::render()
 
   auto begin = chrono::steady_clock::now();
 
-#ifdef FEAT_ANTIALIASING
   std::random_device rd;
   std::mt19937 e2(rd());
   std::uniform_real_distribution<> dist(0.0, 0.999999999);
-#endif
 
-#ifdef PROGRESS
-  double total = pw * ph;
-  long cnt = 0;
-#endif
   for (int y = 0; y < ph; ++y) {
     for (int x = 0; x < pw; ++x) {
-#ifdef PROGRESS
-      if (++cnt % 50 == 0
-          && printf("\rRendered %0.03f%%", (cnt / total) * 100.)) {
-        ;
-      }
-#endif
-
       float3 clr(0., 0., 0.);
-#ifdef FEAT_ANTIALIASING
       for (int p = 0; p < NSAMPLE; ++p) {
         for (int q = 0; q < NSAMPLE; ++q) {
           Ray r = ray(x + (p + dist(e2)) / NSAMPLE,
@@ -212,12 +205,6 @@ Camera::render()
       }
 
       set_pixel(x, y, clr * (1. / SQ(NSAMPLE)));
-#else
-      Ray r = ray(x + 0.5, y + 0.5);
-      // Ray r = ray(x, y);
-      ray_color(0, clr, r, 0, 0., numeric_limits<double>::max());
-      set_pixel(x, y, clr);
-#endif
     }
   }
 

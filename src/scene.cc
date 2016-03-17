@@ -182,7 +182,7 @@ get_token_as_float(string in, int which)
     p = strtok(0, " ");
     if (p == 0) {
       cerr << "c" << endl;
-      exit(-1);
+      return nanf("");
     }
   }
 
@@ -354,6 +354,7 @@ Scene::parse(const string& filename)
 
     case 'c': {
       double x, y, z, vx, vy, vz, d, iw, ih, pw, ph;
+      double lens;
       get_float(x);
       get_float(y);
       get_float(z);
@@ -365,9 +366,10 @@ Scene::parse(const string& filename)
       get_float(ih);
       get_float(pw);
       get_float(ph);
+      get_float(lens);
 
       Camera dummy(x, y, z, vx, vy, vz,
-				 d, iw, ih, int(pw), int(ph), this);
+				 d, iw, ih, int(pw), int(ph), this, lens);
       this->cam.copy(dummy);
       this->cam.scene = this;
 
@@ -400,6 +402,29 @@ Scene::parse(const string& filename)
 #endif
         break;
       }
+
+      case 's': {
+        double x, y, z, nx, ny, nz, ux, uy, uz, len, r, g, b;
+        ++float_cnt;
+        get_float(x);
+        get_float(y);
+        get_float(z);
+        get_float(nx);
+        get_float(ny);
+        get_float(nz);
+        get_float(ux);
+        get_float(uy);
+        get_float(uz);
+        get_float(len);
+        get_float(r);
+        get_float(g);
+        get_float(b);
+        LArea* la = new LArea(x, y, z, nx, ny, nz, ux, uy, uz, len, r, g, b);
+        lights.push_back(la);
+
+        break;
+      }
+
       case 'd': {
         double vx, vy, vz, r, g, b;
         ++float_cnt;
@@ -417,6 +442,7 @@ Scene::parse(const string& filename)
 #endif
         break;
       }
+
       case 'a': {
         double r, g, b;
         ++float_cnt;

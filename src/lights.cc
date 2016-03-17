@@ -44,3 +44,30 @@ LPoint::dist(const Intersection& in) const
 {
   return sqrt(pos.sq_dist(in.p));
 }
+
+float3
+LArea::l(const Intersection& in) const
+{
+  return pos - in.p;
+}
+
+float3
+LArea::l(const Intersection& in, double su, double sv) const
+{
+  float3 pos = this->pos +
+               this->u * (su - 0.5) * len +
+               this->v * (sv - 0.5) * len;
+  return pos - in.p;
+}
+
+LightType
+LArea::type() const
+{
+  return LightType::area;
+}
+
+double
+LArea::dist(const Intersection& in) const
+{
+  return nanf("");
+}
