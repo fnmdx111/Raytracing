@@ -23,6 +23,19 @@ Camera::ray(double i, double j)
              this->pos.x, this->pos.y, this->pos.z);
 }
 
+Ray
+Camera::ray(double i, double j, double& dn)
+{
+  double su = this->l + (this->r - this->l) * i / this->pw;
+  double sv = this->t + (this->b - this->t) * j / this->ph;
+
+  float3 dir = this->dir * this->d + this->u * su + this->v * sv;
+  dn = dir.norm();
+  dir.normalize_();
+
+  return Ray(dir.x, dir.y, dir.z,
+             this->pos.x, this->pos.y, this->pos.z);}
+
 inline void
 Camera::accum_pixel(int i, int j, const float3& rgba)
 {
@@ -60,6 +73,8 @@ Camera::copy(const Camera& other)
   copy_prop(l);
   copy_prop(t);
   copy_prop(b);
+  copy_prop(lens);
+  copy_prop(aperture_size);
 
   pixels.resizeErase(ph, pw);
 }
@@ -144,6 +159,7 @@ Camera::ray_color(int recursion_depth,
         continue;
       }
 
+      float3 a;
       for (int rdi = 0; rdi < SQ(SHDNSAMPLE); ++rdi) {
         double ru = la->dst(la->e2);
         double rv = la->dst(la->e2);
@@ -151,9 +167,10 @@ Camera::ray_color(int recursion_depth,
 
         float3 shd_accum;
         do_shadow(*this, shd_accum, r, lgh, l, in);
-        shd_accum *= in.n.dot(l);
-        accum += shd_accum * (1. / SQ(SHDNSAMPLE));
+        a += shd_accum * in.n.dot(l);
       }
+
+      accum += a * (1. / SQ(SHDNSAMPLE));
 
     } else {
       float3 l = lgh.l(in);
@@ -186,21 +203,63 @@ Camera::render()
 {
   printf("Shyoujyou rendering...\n");
 
-  auto begin = chrono::steady_clock::now();
+#ifdef FEAT_DOF
+  int DOF_SAMPLE = NSAMPLE;
+#else
+  int DOF_SAMPLE = 1;
+#endif
 
-  std::random_device rd;
-  std::mt19937 e2(rd());
-  std::uniform_real_distribution<> dist(0.0, 0.999999999);
+  auto begin = chrono::steady_clock::now();
 
   for (int y = 0; y < ph; ++y) {
     for (int x = 0; x < pw; ++x) {
       float3 clr(0., 0., 0.);
       for (int p = 0; p < NSAMPLE; ++p) {
         for (int q = 0; q < NSAMPLE; ++q) {
-          Ray r = ray(x + (p + dist(e2)) / NSAMPLE,
-                      y + (q + dist(e2)) / NSAMPLE);
+#ifdef FEAT_DOF
+          double dn = 0.;
+#endif
+          Ray r = ray(x + (p + dst(e2)) / NSAMPLE,
+                      y + (q + dst(e2)) / NSAMPLE
+#ifndef FEAT_DOF
+                      );
+#else
+                      , dn);
+#endif
 
-          ray_color(0, clr, r, 0, 0., numeric_limits<double>::max());
+#ifdef FEAT_DOF
+          float3 pfocal = this->pos + r.d * (dn / (d / (d + lens)));
+          float3 subclr;
+
+          for (int o = 0; o < DOF_SAMPLE; ++o) {
+            float3 pertube = this->u * (dst(e2) - 0.5)
+                              + this->v * (dst(e2) - 0.5);
+            pertube *= this->aperture_size;
+
+            float3 aper_pos = r.p + this->w * this->d + pertube;
+            float3 dd = pfocal - aper_pos;
+
+            dd.normalize_();
+//                        cout << "original: " << r.d.to_s() << " " << r.p.to_s() << endl;
+//                        cout << dd.dot(r.d) << endl;
+            Ray rr = Ray(dd, aper_pos);
+//                        cout << "focused: " << rr.d.to_s() << " " << rr.p.to_s() << endl;
+#endif
+
+            ray_color(0,
+#ifdef FEAT_DOF
+                      subclr,
+                      rr,
+#else
+                      clr,
+                      r,
+#endif
+                      0, 0., numeric_limits<double>::max());
+#if FEAT_DOF
+          }
+          subclr *= 1. / DOF_SAMPLE;
+          clr += subclr;
+#endif
         }
       }
 

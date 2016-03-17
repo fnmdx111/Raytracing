@@ -355,6 +355,7 @@ Scene::parse(const string& filename)
     case 'c': {
       double x, y, z, vx, vy, vz, d, iw, ih, pw, ph;
       double lens;
+      double asize;
       get_float(x);
       get_float(y);
       get_float(z);
@@ -367,9 +368,10 @@ Scene::parse(const string& filename)
       get_float(pw);
       get_float(ph);
       get_float(lens);
+      get_float(asize);
 
       Camera dummy(x, y, z, vx, vy, vz,
-				 d, iw, ih, int(pw), int(ph), this, lens);
+				 d, iw, ih, int(pw), int(ph), this, lens, asize);
       this->cam.copy(dummy);
       this->cam.scene = this;
 

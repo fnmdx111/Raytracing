@@ -22,12 +22,11 @@ public:
   int pw, ph;
   double r, l, t, b;
   double lens;
+  double aperture_size = 1e-8;
 
-#ifdef FEAT_DOF
   std::random_device rd;
   std::mt19937 e2;
   std::uniform_real_distribution<> dst;
-#endif
 
   const Scene* scene;
 
@@ -35,15 +34,14 @@ public:
 
   Camera(double x, double y, double z, double vx, double vy, double vz,
          double d, double iw, double ih, int pw, int ph, Scene* scene,
-         double lens = 0.00000001):
+         double lens = 1e-8, double aperture_size = 1e-8):
     pos(float3(x, y, z)), dir(float3(vx, vy, vz)),
     u(float3(0., 0., 0.)), v(float3(0., 0., 0.)), w(float3(-vx, -vy, -vz)),
     d(d), iw(iw), ih(ih), pw(pw), ph(ph),
-    r(0.), l(0.), t(0.), b(0.), lens(isnan(lens) ? 0.00000001 : lens),
-#ifdef FEAT_DOF
-    e2(std::mt19937(rd)),
+    r(0.), l(0.), t(0.), b(0.), lens(isnan(lens) ? 1e-8 : lens),
+    aperture_size(isnan(aperture_size) ? 1e-8 : aperture_size),
+    e2(std::mt19937(rd())),
     dst(std::uniform_real_distribution<>(0.0, 0.999999999)),
-#endif
     scene(scene)
   {
     u = this->dir * float3(0, 1, 0);
@@ -65,6 +63,7 @@ public:
   Camera(const Camera& cam);
 
   Ray ray(double i, double j);
+  Ray ray(double i, double j, double& dn);
   void copy(const Camera& other);
   inline void accum_pixel(int i, int j, const float3& rgb);
   inline void set_pixel(int i, int j, const float3& rgb);
