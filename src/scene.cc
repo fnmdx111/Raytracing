@@ -181,7 +181,6 @@ get_token_as_float(string in, int which)
   for (int i = 0; i < which; ++i) {
     p = strtok(0, " ");
     if (p == 0) {
-      cerr << "c" << endl;
       return nanf("");
     }
   }

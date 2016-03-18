@@ -54,9 +54,7 @@ LArea::l(const Intersection& in) const
 float3
 LArea::l(const Intersection& in, double su, double sv) const
 {
-  float3 pos = this->pos +
-               this->u * (su - 0.5) * len +
-               this->v * (sv - 0.5) * len;
+  float3 pos = this->pos + (this->u * su + this->v * sv) * len;
   return pos - in.p;
 }
 

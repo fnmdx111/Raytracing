@@ -160,14 +160,28 @@ Camera::ray_color(int recursion_depth,
       }
 
       float3 a;
-      for (int rdi = 0; rdi < SQ(SHDNSAMPLE); ++rdi) {
-        double ru = la->dst(la->e2);
-        double rv = la->dst(la->e2);
-        float3 l = la->l(in, ru, rv);
+      // if SHDNSAMPLE is odd, we need to move left 0.5
+      //   0      1     2     3
+      //   -2     -1    0     1
+      // |  *  |  *  |  *  |  *  |
+      // |     |    pos    |     |
+      // |^-2+r|^-1+r| ^0+r| ^1+r|
+      //   0     1      2     3     4
+      //   -2    -1     0     1     2
+      // |  *  |  *  |  *  |  *  |  *  |
+      // |     |     | pos |     |     |
+      // | ^-2-0.5+r   ^-0.5+r
+      //   -2.5  -1.5   -0.5  0.5   1.5
+      for (int rdi = 0; rdi < SHDNSAMPLE; ++rdi) {
+        for (int rdj = 0; rdj < SHDNSAMPLE; ++rdj) {
+          double ru = la->dst(la->e2) + rdi + la->hl;
+          double rv = la->dst(la->e2) + rdj + la->hl;
+          float3 l = la->l(in, ru, rv);
 
-        float3 shd_accum;
-        do_shadow(*this, shd_accum, r, lgh, l, in);
-        a += shd_accum * in.n.dot(l);
+          float3 shd_accum;
+          do_shadow(*this, shd_accum, r, lgh, l, in);
+          a += shd_accum; // * in.n.dot(l);
+        }
       }
 
       accum += a * (1. / SQ(SHDNSAMPLE));

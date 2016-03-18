@@ -47,7 +47,7 @@ public:
   LArea(double px, double py, double pz, double nx, double ny, double nz,
         double ux, double uy, double uz, double len, double r, double g,
         double b): Light(r, g, b), pos(float3(px, py, pz)), n(nx, ny, nz),
-  u(ux, uy, uz), len(len), hl(len / SHDNSAMPLE),
+  u(ux, uy, uz), len(len), hl(-SHDNSAMPLE / 2 - SHDNSAMPLE % 2 == 0 ? 0 : 0.5),
   e2(std::mt19937(rd())),
   dst(std::uniform_real_distribution<>(0.0, 0.99999999))
   {
