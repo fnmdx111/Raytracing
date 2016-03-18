@@ -216,9 +216,8 @@ Camera::ray_color(int recursion_depth,
       }
 
       float3 nu = t * rf;
-      u.normalize_();
-      float3 nv = w * u;
-      v.normalize_();
+      nu.normalize_();
+      float3 nv = rf * nu;
 
       float3 glossy_accum;
       for (int _ = 0; _ < GLSNSAMPLE; ++_) {
@@ -275,14 +274,15 @@ Camera::render()
                         << endl
 #endif
   << endl
-  << "\tMaximum recursion limit = " << MAXRECUR << endl
+  << "\tMaximal recursion limit = " << MAXRECUR << endl
   << "\tEpsilon = " << SEPSILON << endl
   << "\tPrimary rays per pixel = " << SQ(NSAMPLE) << endl
   << "\tShadow rays per primary ray = " << SQ(SHDNSAMPLE) << endl
   << "\tGlossy rays per primary ray = " << GLSNSAMPLE << endl
-  << "\tProgress sample rate = " << PROGRESS_SAMPLE_RATE << endl
+  << "\tProgress sample rate = every " << PROGRESS_SAMPLE_RATE << " pixels"
+  << endl
 #ifdef FEAT_DOF
-  << "\tDOF rays per primary ray = " << DOFNSAMPLE << endl
+  << "\tDoF rays per primary ray = " << DOFNSAMPLE << endl
   << "\tAperture size = " << aperture_size << endl
   << "\tFocal depth = " << lens << endl
 #endif
@@ -328,13 +328,15 @@ Camera::render()
 #ifdef FEAT_DOF
           float3 sub;
           for (int o = 0; o < DOFNSAMPLE; ++o) {
-            float3 pertube = this->u * (dst(e2) - 0.5)
-                             + this->v * (dst(e2) - 0.5);
-            pertube *= this->aperture_size;
-            r.p += pertube;
+            float3 rand_point = this->u * (dst(e2) - 0.5)
+                                + this->v * (dst(e2) - 0.5);
+            rand_point *= this->aperture_size;
+
             r.d *= this->lens;
-            r.d -= pertube;
+            r.d -= rand_point;
             r.d.normalize_();
+
+            r.p += rand_point;
 
             ray_color(0, sub, r, 0,
                       0., numeric_limits<double>::max());
