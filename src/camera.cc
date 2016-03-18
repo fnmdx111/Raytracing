@@ -110,6 +110,7 @@ do_shadow(Camera& cam, float3& accum, const Ray& r, const Light& lgh,
 extern int NSAMPLE;
 extern int SHDNSAMPLE;
 extern int GLSNSAMPLE;
+extern int DOFNSAMPLE;
 void
 Camera::ray_color(int recursion_depth,
                   float3& accum,
@@ -270,7 +271,7 @@ Camera::render()
   << "Yes if a glossy material is included in the scene" << endl
   << "\tProgress = " << "Yes" << endl
 #ifdef FEAT_DOF
-  << "\tDepth of field" << "Yes if the camera is set with related parameters"
+  << "\tDepth of field = " << "Yes if the camera is set with related parameters"
                         << endl
 #endif
   << endl
@@ -279,11 +280,13 @@ Camera::render()
   << "\tPrimary rays per pixel = " << SQ(NSAMPLE) << endl
   << "\tShadow rays per primary ray = " << SQ(SHDNSAMPLE) << endl
   << "\tGlossy rays per primary ray = " << GLSNSAMPLE << endl
-  << "\tProgress sample rate = " << PROGRESS_SAMPLE_RATE << endl;
+  << "\tProgress sample rate = " << PROGRESS_SAMPLE_RATE << endl
 #ifdef FEAT_DOF
+  << "\tDOF rays per primary ray = " << DOFNSAMPLE << endl
   << "\tAperture size = " << aperture_size << endl
   << "\tFocal depth = " << lens << endl
 #endif
+  ;
   auto begin = chrono::steady_clock::now();
 
   int pixel_cnt = 0;
@@ -306,11 +309,12 @@ Camera::render()
 
         printf(
 #if defined(__clang__)
-               "Rendered % 2.2lf%%, % 2.2lld pixels/s...\r",
+               "Rendered % 2.2lf%% in %lld seconds, % 2.2lld pixels/s...\r",
 #else
-               "Rendered % 2.2lf%%, % 2.2ld pixels/s...\r",
+               "Rendered % 2.2lf%% in %ld seconds, % 2.2ld pixels/s...\r",
 #endif
                pixel_cnt / total_cnt,
+               time_elapsed,
                pixel_cnt / time_elapsed);
         fflush(stdout);
       }
@@ -322,17 +326,25 @@ Camera::render()
                       y + (q + dst(e2)) / NSAMPLE);
 
 #ifdef FEAT_DOF
-          float3 pertube = this->u * (dst(e2) - 0.5)
-                           + this->v * (dst(e2) - 0.5);
-          pertube *= this->aperture_size;
-          r.p += pertube;
-          r.d *= this->lens;
-          r.d -= pertube;
-          r.d.normalize_();
-#endif
+          float3 sub;
+          for (int o = 0; o < DOFNSAMPLE; ++o) {
+            float3 pertube = this->u * (dst(e2) - 0.5)
+                             + this->v * (dst(e2) - 0.5);
+            pertube *= this->aperture_size;
+            r.p += pertube;
+            r.d *= this->lens;
+            r.d -= pertube;
+            r.d.normalize_();
 
+            ray_color(0, sub, r, 0,
+                      0., numeric_limits<double>::max());
+          }
+          sub *= 1. / DOFNSAMPLE;
+          clr += sub;
+#else
           ray_color(0, clr, r, 0,
                     0., numeric_limits<double>::max());
+#endif
         }
       }
 

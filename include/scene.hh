@@ -63,7 +63,13 @@ public:
   ~Scene()
   {
     delete root;
-  }
+
+    for_each(shapes.begin(), shapes.end(),
+             [](Shape* sh) { delete sh; });
+    for_each(lights.begin(), lights.end(),
+             [](Light* l) { delete l; });
+    for_each(materials.begin(), materials.end(),
+             [](Material* mat) { delete mat; });  }
 
 private:
   void parse(const string& fn);
