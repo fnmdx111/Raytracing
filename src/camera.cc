@@ -34,7 +34,8 @@ Camera::ray(double i, double j, double& dn)
   dir.normalize_();
 
   return Ray(dir.x, dir.y, dir.z,
-             this->pos.x, this->pos.y, this->pos.z);}
+             this->pos.x, this->pos.y, this->pos.z);
+}
 
 inline void
 Camera::accum_pixel(int i, int j, const float3& rgba)
@@ -85,7 +86,7 @@ Camera::Camera(const Camera& other)
 }
 
 void
-do_shadow(const Camera& cam, float3& accum, const Ray& r, const Light& lgh,
+do_shadow(Camera& cam, float3& accum, const Ray& r, const Light& lgh,
           float3& l, const Intersection& in)
 {
 
@@ -106,13 +107,15 @@ do_shadow(const Camera& cam, float3& accum, const Ray& r, const Light& lgh,
   }
 }
 
+extern int NSAMPLE;
 extern int SHDNSAMPLE;
+extern int GLSNSAMPLE;
 void
 Camera::ray_color(int recursion_depth,
                   float3& accum,
                   const Ray& r,
                   const Light* shadow_lgh,
-                  double t0, double t1) const
+                  double t0, double t1)
 {
   if (recursion_depth > MAXRECUR) {
     return;
@@ -198,82 +201,138 @@ Camera::ray_color(int recursion_depth,
   } else {
     float3 rf = r.d - in.n * r.d.dot(in.n) * 2;
     rf.normalize_();
-    Ray rr(rf, in.p);
 
-    float3 r_accum(0., 0., 0.);
-    ray_color(recursion_depth + 1,
-              r_accum,
-              rr, 0,
-              SEPSILON,
-              numeric_limits<double>::max());
-    accum += mat.i.pll_mul(r_accum);
+    if (!FEQ(mat.a, 0.0)) {
+      double min_rf = min(rf.x, min(rf.y, rf.z));
+
+      float3 t(rf);
+      if (FEQ(min_rf, rf.x)) {
+        t.x = 1;
+      } else if (FEQ(min_rf, rf.y)) {
+        t.y = 1;
+      } else if (FEQ(min_rf, rf.z)) {
+        t.z = 1;
+      }
+
+      float3 nu = t * rf;
+      u.normalize_();
+      float3 nv = w * u;
+      v.normalize_();
+
+      float3 glossy_accum;
+      for (int _ = 0; _ < GLSNSAMPLE; ++_) {
+        float3 nrf = rf + (nu * (dst(e2) - 0.5) + nv * (dst(e2) - 0.5)) * mat.a;
+        nrf.normalize_();
+        Ray rr(nrf, in.p);
+
+        float3 t_accum;
+        ray_color(recursion_depth + 1,
+                  t_accum,
+                  rr, 0,
+                  SEPSILON,
+                  numeric_limits<double>::max());
+        glossy_accum += mat.i.pll_mul(t_accum);
+      }
+
+      accum += glossy_accum * (1. / GLSNSAMPLE);
+
+    } else {
+
+      Ray rr(rf, in.p);
+
+      float3 r_accum(0., 0., 0.);
+      ray_color(recursion_depth + 1,
+                r_accum,
+                rr, 0,
+                SEPSILON,
+                numeric_limits<double>::max());
+      accum += mat.i.pll_mul(r_accum);
+    }
   }
 }
 
-extern int NSAMPLE;
 
 void
 Camera::render()
 {
-  printf("Shyoujyou rendering...\n");
+#define PROGRESS_SAMPLE_RATE 700
 
 #ifdef FEAT_DOF
   int DOF_SAMPLE = NSAMPLE;
-#else
-  int DOF_SAMPLE = 1;
 #endif
 
+  cout << endl
+  << "Renderer parameters:" << endl
+  << "\tRendering with BVH tree = " << "Yes" << endl
+  << "\tSoft shadow = " << "Yes if an area light is included in the scene"
+                        << endl
+  << "\tGlossy reflection = "
+  << "Yes if a glossy material is included in the scene" << endl
+  << "\tProgress = " << "Yes" << endl
+#ifdef FEAT_DOF
+  << "\tDepth of field" << "Yes if the camera is set with related parameters"
+                        << endl
+#endif
+  << endl
+  << "\tMaximum recursion limit = " << MAXRECUR << endl
+  << "\tEpsilon = " << SEPSILON << endl
+  << "\tPrimary rays per pixel = " << SQ(NSAMPLE) << endl
+  << "\tShadow rays per primary ray = " << SQ(SHDNSAMPLE) << endl
+  << "\tGlossy rays per primary ray = " << GLSNSAMPLE << endl
+  << "\tProgress sample rate = " << PROGRESS_SAMPLE_RATE << endl;
+#ifdef FEAT_DOF
+  << "\tAperture size = " << aperture_size << endl
+  << "\tFocal depth = " << lens << endl
+#endif
   auto begin = chrono::steady_clock::now();
+
+  int pixel_cnt = 0;
+  double total_cnt = ph * pw / 100.0;
+
+  cout << endl
+  << "Scene parameters:" << endl
+  << "\tTotal pixels = " << ph * pw << endl << endl;
+
+  printf("Shyoujyou rendering...\n");
 
   for (int y = 0; y < ph; ++y) {
     for (int x = 0; x < pw; ++x) {
+
+      ++pixel_cnt;
+      if (pixel_cnt % PROGRESS_SAMPLE_RATE == 0) {
+        auto time_elapsed = chrono::duration_cast<chrono::seconds>(
+                    chrono::steady_clock::now() - begin).count();
+        time_elapsed = FEQ(time_elapsed, 0.0) ? 1.0 : time_elapsed;
+
+        printf(
+#if defined(__clang__)
+               "Rendered % 2.2lf%%, % 2.2lld pixels/s...\r",
+#else
+               "Rendered % 2.2lf%%, % 2.2ld pixels/s...\r",
+#endif
+               pixel_cnt / total_cnt,
+               pixel_cnt / time_elapsed);
+        fflush(stdout);
+      }
+
       float3 clr(0., 0., 0.);
       for (int p = 0; p < NSAMPLE; ++p) {
         for (int q = 0; q < NSAMPLE; ++q) {
-#ifdef FEAT_DOF
-          double dn = 0.;
-#endif
           Ray r = ray(x + (p + dst(e2)) / NSAMPLE,
-                      y + (q + dst(e2)) / NSAMPLE
-#ifndef FEAT_DOF
-                      );
-#else
-                      , dn);
-#endif
+                      y + (q + dst(e2)) / NSAMPLE);
 
 #ifdef FEAT_DOF
-          float3 pfocal = this->pos + r.d * (dn / (d / (d + lens)));
-          float3 subclr;
-
-          for (int o = 0; o < DOF_SAMPLE; ++o) {
-            float3 pertube = this->u * (dst(e2) - 0.5)
-                              + this->v * (dst(e2) - 0.5);
-            pertube *= this->aperture_size;
-
-            float3 aper_pos = r.p + this->w * this->d + pertube;
-            float3 dd = pfocal - aper_pos;
-
-            dd.normalize_();
-//                        cout << "original: " << r.d.to_s() << " " << r.p.to_s() << endl;
-//                        cout << dd.dot(r.d) << endl;
-            Ray rr = Ray(dd, aper_pos);
-//                        cout << "focused: " << rr.d.to_s() << " " << rr.p.to_s() << endl;
+          float3 pertube = this->u * (dst(e2) - 0.5)
+                           + this->v * (dst(e2) - 0.5);
+          pertube *= this->aperture_size;
+          r.p += pertube;
+          r.d *= this->lens;
+          r.d -= pertube;
+          r.d.normalize_();
 #endif
 
-            ray_color(0,
-#ifdef FEAT_DOF
-                      subclr,
-                      rr,
-#else
-                      clr,
-                      r,
-#endif
-                      0, 0., numeric_limits<double>::max());
-#if FEAT_DOF
-          }
-          subclr *= 1. / DOF_SAMPLE;
-          clr += subclr;
-#endif
+          ray_color(0, clr, r, 0,
+                    0., numeric_limits<double>::max());
         }
       }
 
@@ -282,14 +341,12 @@ Camera::render()
   }
 
   auto end = chrono::steady_clock::now();
-#ifdef PROGRESS
-  printf(".\n");
-#endif
+
   printf(
 #if defined(__clang__)
-         "Done in %lld seconds.\n",
+         "\nDone in %lld seconds.\n",
 #else
-         "Done in %ld seconds.\n",
+         "\nDone in %ld seconds.\n",
 #endif
          chrono::duration_cast<chrono::seconds>(end - begin).count());
 }

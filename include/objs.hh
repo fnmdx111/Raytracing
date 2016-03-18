@@ -14,11 +14,12 @@ class Material
 public:
   float3 d, s, i;
   double r;
+  double a;
 
   Material(double adr, double adg, double adb, double asr, double asg, double asb,
-	   double ar, double air, double aig, double aib):
+	   double ar, double air, double aig, double aib, double a):
     d(float3(adr, adg, adb)), s(float3(asr, asg, asb)),
-    i(float3(air, aig, aib)), r(ar) {}
+    i(float3(air, aig, aib)), r(ar), a(isnan(a) ? 0.0 : a) {}
   ~Material() {}
 
   void diffuse(float3& a, const float3& l, const float3& n, const float3& d,

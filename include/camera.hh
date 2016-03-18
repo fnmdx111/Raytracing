@@ -10,7 +10,7 @@ using namespace Imf;
 
 class Scene;
 
-#define MAXRECUR 10
+#define MAXRECUR 4
 
 #define CAMEPSILON -0.001
 
@@ -72,7 +72,7 @@ public:
                    float3& ret,
                    const Ray& r,
                    const Light* shadow_lgh,
-                   double t0, double t1) const;
+                   double t0, double t1);
 
   void render();
   void save(const string& s) const;

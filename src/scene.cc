@@ -462,7 +462,7 @@ Scene::parse(const string& filename)
       break;
     }
     case 'm': {
-      double dr, dg, db, sr, sg, sb, r, ir, ig, ib;
+      double dr, dg, db, sr, sg, sb, r, ir, ig, ib, a;
       get_float(dr);
       get_float(dg);
       get_float(db);
@@ -473,8 +473,9 @@ Scene::parse(const string& filename)
       get_float(ir);
       get_float(ig);
       get_float(ib);
+      get_float(a);
       last_material = new Material(dr, dg, db, sr, sg, sb,
-                                   r, ir, ig, ib);
+                                   r, ir, ig, ib, a);
       mats.push_back(last_material);
 #ifdef __DEBUG__
       printf("debug::material: %f %f %f, %f %f %f, %f, %f %f %f\n",
