@@ -1,6 +1,7 @@
 #ifndef __H_SCENE__
 #define __H_SCENE__
 
+#include <algorithm>
 #include "objs.hh"
 #include "lights.hh"
 #include "camera.hh"
@@ -64,12 +65,12 @@ public:
   {
     delete root;
 
-    for_each(shapes.begin(), shapes.end(),
-             [](Shape* sh) { delete sh; });
-    for_each(lights.begin(), lights.end(),
-             [](Light* l) { delete l; });
-    for_each(materials.begin(), materials.end(),
-             [](Material* mat) { delete mat; });  }
+    std::for_each(shapes.begin(), shapes.end(),
+                  [](Shape* sh) { delete sh; });
+    std::for_each(lights.begin(), lights.end(),
+                  [](Light* l) { delete l; });
+    std::for_each(materials.begin(), materials.end(),
+                  [](Material* mat) { delete mat; });  }
 
 private:
   void parse(const string& fn);

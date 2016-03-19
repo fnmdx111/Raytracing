@@ -10,7 +10,7 @@ using namespace Imf;
 
 class Scene;
 
-#define MAXRECUR 4
+#define MAXRECUR 5
 
 #define CAMEPSILON -0.001
 
@@ -39,8 +39,8 @@ public:
     u(float3(0., 0., 0.)), v(float3(0., 0., 0.)), w(float3(-vx, -vy, -vz)),
     d(d), iw(iw), ih(ih), pw(pw), ph(ph),
     r(0.), l(0.), t(0.), b(0.),
-    lens(isnan(lens) ? 1e100 : lens),
-    aperture_size(isnan(aperture_size) ? 1e-100 : aperture_size),
+    lens(std::isnan(lens) ? 1e100 : lens),
+    aperture_size(std::isnan(aperture_size) ? 1e-100 : aperture_size),
     e2(std::mt19937(rd())),
     dst(std::uniform_real_distribution<>(0.0, 0.999999999)),
     scene(scene)

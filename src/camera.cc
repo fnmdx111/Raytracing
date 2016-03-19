@@ -113,8 +113,13 @@ do_shadow(Camera& cam, float3& accum, const Ray& r, const Light& lgh,
 
 extern int NSAMPLE;
 extern int SHDNSAMPLE;
+#ifdef FEAT_GLOSSY
 extern int GLSNSAMPLE;
+#endif
+#ifdef FEAT_DOF
 extern int DOFNSAMPLE;
+#endif
+
 void
 Camera::ray_color(int recursion_depth,
                   float3& accum,
@@ -207,6 +212,7 @@ Camera::ray_color(int recursion_depth,
     float3 rf = r.d - in.n * r.d.dot(in.n) * 2;
     rf.normalize_();
 
+#ifdef FEAT_GLOSSY
     if (!FEQ(mat.a, 0.0)) {
       double min_rf = min(rf.x, min(rf.y, rf.z));
 
@@ -241,6 +247,7 @@ Camera::ray_color(int recursion_depth,
       accum += glossy_accum * (1. / GLSNSAMPLE);
 
     } else {
+#endif
 
       Ray rr(rf, in.p);
 
@@ -251,7 +258,9 @@ Camera::ray_color(int recursion_depth,
                 SEPSILON,
                 numeric_limits<double>::max());
       accum += mat.i.pll_mul(r_accum);
+#ifdef FEAT_GLOSSY
     }
+#endif
   }
 }
 
@@ -261,17 +270,15 @@ Camera::render()
 {
 #define PROGRESS_SAMPLE_RATE 700
 
-#ifdef FEAT_DOF
-  int DOF_SAMPLE = NSAMPLE;
-#endif
-
   cout << endl
   << "Renderer parameters:" << endl
   << "\tRendering with BVH tree = " << "Yes" << endl
   << "\tSoft shadow = " << "Yes if an area light is included in the scene"
                         << endl
+#ifdef FEAT_GLOSSY
   << "\tGlossy reflection = "
   << "Yes if a glossy material is included in the scene" << endl
+#endif
   << "\tProgress = " << "Yes" << endl
 #ifdef FEAT_DOF
   << "\tDepth of field = " << "Yes if the camera is set with related parameters"
@@ -282,7 +289,9 @@ Camera::render()
   << "\tEpsilon = " << SEPSILON << endl
   << "\tPrimary rays per pixel = " << SQ(NSAMPLE) << endl
   << "\tShadow rays per primary ray = " << SQ(SHDNSAMPLE) << endl
+#ifdef FEAT_GLOSSY
   << "\tGlossy rays per primary ray = " << GLSNSAMPLE << endl
+#endif
   << "\tProgress sample rate = every " << PROGRESS_SAMPLE_RATE << " pixels"
   << endl
 #ifdef FEAT_DOF
