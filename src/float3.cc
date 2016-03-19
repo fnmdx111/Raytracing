@@ -174,3 +174,16 @@ bisector(const float3& v, const float3& l)
 {
   return (v + l).normalize();
 }
+
+#define FEPSILON 1e-3
+bool
+float3::is_epsilon() const
+{
+  return FEQ(x, FEPSILON) && FEQ(y, FEPSILON) && FEQ(z, FEPSILON);
+}
+
+bool
+float3::is_nan() const
+{
+  return std::isnan(x) || std::isnan(y) || std::isnan(z);
+}

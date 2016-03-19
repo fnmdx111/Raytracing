@@ -111,6 +111,82 @@ do_shadow(Camera& cam, float3& accum, const Ray& r, const Light& lgh,
   }
 }
 
+#ifdef FEAT_REFRACT
+bool
+refract(const float3& dir, const float3& n, const double ni, float3& t)
+{
+  double ddotn = dir.dot(n);
+  double discrim = (1.0 - SQ(ddotn)) / SQ(ni);
+  if (1.0 >= discrim) {
+    t = (dir - n * ddotn) * (1.0 / ni) - n * sqrt(1.0 - discrim);
+    t.normalize_(); // TODO ??
+    return true;
+  }
+
+  return false;
+}
+#endif
+
+void
+do_dirty(Camera& cam, float3& accum,
+         const Ray& ori_r, const Ray& new_r,
+         const Material& mat,
+         int recursion_depth, const Intersection& in)
+{
+#ifdef FEAT_REFRACT
+  if (mat.is_refractive) {
+    double c = 0.0;
+    float3 k;
+
+    float3 t;
+    if (ori_r.d.dot(in.n) < 0) {
+      refract(ori_r.d, in.n, mat.ni, t);
+      c = -ori_r.d.dot(in.n);
+
+      k.x = k.y = k.z = 1.0;
+    } else {
+      k.x = exp(mat.l.x * in.t);
+      k.y = exp(mat.l.y * in.t);
+      k.z = exp(mat.l.z * in.t);
+      if (refract(ori_r.d, in.n * -1, 1 / mat.ni, t)) {
+        c = t.dot(in.n);
+
+      } else {
+        float3 k_accum;
+        cam.ray_color(recursion_depth + 1, k_accum, new_r, 0,
+                      SEPSILON, numeric_limits<double>::max());
+        accum += k.pll_mul(k_accum);
+        return;
+      }
+    }
+
+    double rR0 = SQ(mat.ni - 1) / SQ(mat.ni + 1);
+    double rR = rR0 + (1 - rR0) * pow(1 - c, 5);
+
+    Ray tr(t, new_r.p);
+
+
+    float3 ret_accum;
+    float3 acc1;
+    cam.ray_color(recursion_depth + 1, acc1, new_r, 0,
+                  SEPSILON, numeric_limits<double>::max());
+    ret_accum += acc1 * rR;
+
+    cam.ray_color(recursion_depth + 1, acc1, tr, 0,
+                  SEPSILON, numeric_limits<double>::max());
+    ret_accum += acc1 * (1 - rR);
+
+    accum += k.pll_mul(ret_accum);
+  } else
+#endif
+    if (mat.is_reflective) {
+  float3 t_accum;
+  cam.ray_color(recursion_depth + 1, t_accum, new_r, 0,
+                SEPSILON, numeric_limits<double>::max());
+  accum += mat.i.pll_mul(t_accum);
+}
+}
+
 extern int NSAMPLE;
 extern int SHDNSAMPLE;
 #ifdef FEAT_GLOSSY
@@ -185,8 +261,15 @@ Camera::ray_color(int recursion_depth,
       // |     |     | pos |     |     |
       // | ^-2-0.5+r   ^-0.5+r
       //   -2.5  -1.5   -0.5  0.5   1.5
+      int samples_taken = 0;
+
+#ifdef CUTTHRU
+      float3 last_shd_accum(nanf(""), nanf(""), nanf(""));
+#endif
+
       for (int rdi = 0; rdi < SHDNSAMPLE; ++rdi) {
         for (int rdj = 0; rdj < SHDNSAMPLE; ++rdj) {
+          ++samples_taken;
           double ru = la->dst(la->e2) + rdi + la->hl;
           double rv = la->dst(la->e2) + rdj + la->hl;
           float3 l = la->l(in, ru, rv);
@@ -194,10 +277,20 @@ Camera::ray_color(int recursion_depth,
           float3 shd_accum;
           do_shadow(*this, shd_accum, r, lgh, l, in);
           a += shd_accum; // * in.n.dot(l);
+
+#ifdef CUTTHRU
+          if (!last_shd_accum.is_nan()
+              && (shd_accum - last_shd_accum).is_epsilon()) {
+            // CUT-THROUGH
+            break;
+          } else {
+            last_shd_accum = shd_accum;
+          }
+#endif
         }
       }
 
-      accum += a * (1. / SQ(SHDNSAMPLE));
+      accum += a * (1. / samples_taken);
 
     } else {
       float3 l = lgh.l(in);
@@ -206,7 +299,7 @@ Camera::ray_color(int recursion_depth,
     }
   }
 
-  if (mat.i.is_zero()) {
+  if (!mat.is_reflective && !mat.is_refractive) {
     return;
   } else {
     float3 rf = r.d - in.n * r.d.dot(in.n) * 2;
@@ -230,34 +323,37 @@ Camera::ray_color(int recursion_depth,
       float3 nv = rf * nu;
 
       float3 glossy_accum;
-      for (int _ = 0; _ < GLSNSAMPLE; ++_) {
+#ifdef CUTTHRU
+      float3 last_accum(nanf(""), nanf(""), nanf(""));
+#endif
+      int _cnt = 0;
+      for (; _cnt < GLSNSAMPLE; ++_cnt) {
         float3 nrf = rf + (nu * (dst(e2) - 0.5) + nv * (dst(e2) - 0.5)) * mat.a;
         nrf.normalize_();
         Ray rr(nrf, in.p);
 
-        float3 t_accum;
-        ray_color(recursion_depth + 1,
-                  t_accum,
-                  rr, 0,
-                  SEPSILON,
-                  numeric_limits<double>::max());
-        glossy_accum += mat.i.pll_mul(t_accum);
+#ifdef CUTTHRU
+        float3 tmp_accum;
+        do_dirty(*this, tmp_accum, r, rr, mat, recursion_depth, in);
+        glossy_accum += tmp_accum;
+
+        if (!last_accum.is_nan() && (tmp_accum - last_accum).is_epsilon()) {
+          break;
+        } else {
+          last_accum = tmp_accum;
+        }
+#else
+        do_dirty(*this, glossy_accum, r, rr, mat, recursion_depth, in);
+#endif
       }
 
-      accum += glossy_accum * (1. / GLSNSAMPLE);
+      accum += glossy_accum * (1. / _cnt);
 
     } else {
 #endif
-
       Ray rr(rf, in.p);
 
-      float3 r_accum(0., 0., 0.);
-      ray_color(recursion_depth + 1,
-                r_accum,
-                rr, 0,
-                SEPSILON,
-                numeric_limits<double>::max());
-      accum += mat.i.pll_mul(r_accum);
+      do_dirty(*this, accum, r, rr, mat, recursion_depth, in);
 #ifdef FEAT_GLOSSY
     }
 #endif
@@ -276,14 +372,21 @@ Camera::render()
   << "\tSoft shadow = " << "Yes if an area light is included in the scene"
                         << endl
 #ifdef FEAT_GLOSSY
-  << "\tGlossy reflection = "
+  << "\tGlossy effect = "
   << "Yes if a glossy material is included in the scene" << endl
 #endif
-  << "\tProgress = " << "Yes" << endl
+#ifdef FEAT_REFRACT
+  << "\tRefractions = "
+  << "Yes if a refractive material is included in the scene" << endl
+#endif
 #ifdef FEAT_DOF
   << "\tDepth of field = " << "Yes if the camera is set with related parameters"
                         << endl
 #endif
+#ifdef CUTTHRU
+  << "\tRay color epsilon cut-through = " << "Yes" << endl
+#endif
+  << "\tProgress = " << "Yes" << endl
   << endl
   << "\tMaximal recursion limit = " << MAXRECUR << endl
   << "\tEpsilon = " << SEPSILON << endl
@@ -344,7 +447,13 @@ Camera::render()
 
 #ifdef FEAT_DOF
           float3 sub;
-          for (int o = 0; o < DOFNSAMPLE; ++o) {
+          int o = 0;
+
+#ifdef CUTTHRU
+          float3 last_tmp_sub(nanf(""), nanf(""), nanf(""));
+#endif
+
+          for (; o < DOFNSAMPLE; ++o) {
             float3 rand_point = this->u * (dst(e2) - 0.5)
                                 + this->v * (dst(e2) - 0.5);
             rand_point *= this->aperture_size;
@@ -355,10 +464,22 @@ Camera::render()
 
             r.p += rand_point;
 
+#ifdef CUTTHRU
+            float3 tmp_sub;
+            ray_color(0, tmp_sub, r, 0, 0., numeric_limits<double>::max());
+            sub += tmp_sub;
+            if (!last_tmp_sub.is_nan()
+                && (tmp_sub - last_tmp_sub).is_epsilon()) {
+              break;
+            } else {
+              last_tmp_sub = tmp_sub;
+            }
+#else
             ray_color(0, sub, r, 0,
                       0., numeric_limits<double>::max());
+#endif
           }
-          sub *= 1. / DOFNSAMPLE;
+          sub *= 1. / o;
           clr += sub;
 #else
           ray_color(0, clr, r, 0,

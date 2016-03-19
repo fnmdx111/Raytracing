@@ -30,6 +30,8 @@ struct float3
   double norm() const;
   float3& negate();
   bool is_zero() const;
+  bool is_epsilon() const;
+  bool is_nan() const;
 
   float3 pll_mul(const float3& y) const;
 
@@ -39,7 +41,7 @@ struct float3
 };
 
 #define SQ(x) ((x) * (x))
-#define FEQ(x, y) (std::fabs((x) - (y)) < 1e-10)
+#define FEQ(x, y) (std::fabs((x) - (y)) < 1e-7)
 
 float3 bisector(const float3& v, const float3& l);
 

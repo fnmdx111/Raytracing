@@ -3,6 +3,7 @@
 
 #include <vector>
 #include "float3.hh"
+#include <cassert>
 
 using namespace std;
 
@@ -12,14 +13,30 @@ class Light;
 class Material
 {
 public:
-  float3 d, s, i;
+  float3 d, s, i, l;
   double r;
   double a;
+  double ni;
+  bool is_reflective;
+  bool is_refractive;
 
   Material(double adr, double adg, double adb, double asr, double asg, double asb,
-	   double ar, double air, double aig, double aib, double a):
+           double ar, double air, double aig, double aib, double a,
+           double lr, double lg, double lb, double ni):
     d(float3(adr, adg, adb)), s(float3(asr, asg, asb)),
-    i(float3(air, aig, aib)), r(ar), a(std::isnan(a) ? 0.0 : a) {}
+    i(float3(air, aig, aib)),
+#define DEFAULT0(t) std::isnan(t) ? 0.0 : (t)
+    l(float3(DEFAULT0(lr), DEFAULT0(lg), DEFAULT0(lb))),
+    r(ar), a(DEFAULT0(a)),
+    is_reflective(!i.is_zero()), is_refractive(!l.is_zero()), ni(ni)
+  {
+    if (is_refractive) {
+      l.x = std::log(l.x);
+      l.y = std::log(l.y);
+      l.z = std::log(l.z);
+    }
+  }
+
   ~Material() {}
 
   void diffuse(float3& a, const float3& l, const float3& n, const float3& d,
@@ -119,13 +136,15 @@ class Ray
 {
 public:
   float3 d, p;
+  Material* mat;
   char type;
 
   Ray(double dx, double dy, double dz,
       double px, double py, double pz):
-  d(float3(dx, dy, dz)), p(float3(px, py, pz)), type('r') {}
-  Ray(const float3& dd, const float3& pp): type('r')
+  d(float3(dx, dy, dz)), p(float3(px, py, pz)), type('r'), mat(0) {}
+  Ray(const float3& dd, const float3& pp): type('r'), mat(0)
   {
+    assert(FEQ(dd.norm(), 1.0));
     this->d.x = dd.x;
     this->d.y = dd.y;
     this->d.z = dd.z;
