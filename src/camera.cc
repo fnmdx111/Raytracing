@@ -8,6 +8,10 @@
 #include "shapes.hh"
 #include <cassert>
 
+#ifdef USE_TBB
+#include "tbb/tbb.h"
+#endif
+
 using namespace std;
 
 Ray
@@ -298,9 +302,13 @@ Camera::render()
 
   printf("Shyoujyou rendering...\n");
 
+#ifdef USE_TBB
+  tbb::parallel_for(0, ph, [&](int y) {
+    tbb::parallel_for(0, pw, [&](int x) {
+#else
   for (int y = 0; y < ph; ++y) {
     for (int x = 0; x < pw; ++x) {
-
+#endif
       ++pixel_cnt;
       if (pixel_cnt % PROGRESS_SAMPLE_RATE == 0) {
         auto time_elapsed = chrono::duration_cast<chrono::seconds>(
@@ -351,8 +359,13 @@ Camera::render()
       }
 
       set_pixel(x, y, clr * (1. / SQ(NSAMPLE)));
+#ifdef USE_TBB
+    });
+  });
+#else
     }
   }
+#endif
 
   auto end = chrono::steady_clock::now();
 
