@@ -10,7 +10,7 @@ using namespace Imf;
 
 class Scene;
 
-#define MAXRECUR 6
+#define MAXRECUR 4
 
 #define CAMEPSILON -0.001
 
@@ -76,6 +76,7 @@ public:
                    double t0, double t1);
 
   void render();
+  void render(int pxs, int pxe, int pys, int pye);
   void save(const string& s) const;
 };
 

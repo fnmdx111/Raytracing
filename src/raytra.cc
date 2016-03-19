@@ -15,6 +15,8 @@ int GLSNSAMPLE = 1;
 int DOFNSAMPLE = 1;
 #endif
 
+int TILE_SIZE = 32;
+
 int
 main(int argc, char** argv)
 {
@@ -38,6 +40,9 @@ main(int argc, char** argv)
     DOFNSAMPLE = atoi(argv[6]);
   }
 #endif
+  if (argc > 7) {
+    TILE_SIZE = atoi(argv[7]);
+  }
 
   Scene scene((string(argv[1])));
   scene.cam.render();

@@ -195,6 +195,7 @@ extern int GLSNSAMPLE;
 #ifdef FEAT_DOF
 extern int DOFNSAMPLE;
 #endif
+extern int TILE_SIZE;
 
 void
 Camera::ray_color(int recursion_depth,
@@ -360,85 +361,11 @@ Camera::ray_color(int recursion_depth,
   }
 }
 
-
 void
-Camera::render()
+Camera::render(int pxs, int pxe, int pys, int pye)
 {
-#define PROGRESS_SAMPLE_RATE 700
-
-  cout << endl
-  << "Renderer parameters:" << endl
-  << "\tRendering with BVH tree = " << "Yes" << endl
-  << "\tSoft shadow = " << "Yes if an area light is included in the scene"
-                        << endl
-#ifdef FEAT_GLOSSY
-  << "\tGlossy effect = "
-  << "Yes if a glossy material is included in the scene" << endl
-#endif
-#ifdef FEAT_REFRACT
-  << "\tRefractions = "
-  << "Yes if a refractive material is included in the scene" << endl
-#endif
-#ifdef FEAT_DOF
-  << "\tDepth of field = " << "Yes if the camera is set with related parameters"
-                        << endl
-#endif
-#ifdef CUTTHRU
-  << "\tRay color epsilon cut-through = " << "Yes" << endl
-#endif
-  << "\tProgress = " << "Yes" << endl
-  << endl
-  << "\tMaximal recursion limit = " << MAXRECUR << endl
-  << "\tEpsilon = " << SEPSILON << endl
-  << "\tPrimary rays per pixel = " << SQ(NSAMPLE) << endl
-  << "\tShadow rays per primary ray = " << SQ(SHDNSAMPLE) << endl
-#ifdef FEAT_GLOSSY
-  << "\tGlossy rays per primary ray = " << GLSNSAMPLE << endl
-#endif
-  << "\tProgress sample rate = every " << PROGRESS_SAMPLE_RATE << " pixels"
-  << endl
-#ifdef FEAT_DOF
-  << "\tDoF rays per primary ray = " << DOFNSAMPLE << endl
-  << "\tAperture size = " << aperture_size << endl
-  << "\tFocal depth = " << lens << endl
-#endif
-  ;
-  auto begin = chrono::steady_clock::now();
-
-  int pixel_cnt = 0;
-  double total_cnt = ph * pw / 100.0;
-
-  cout << endl
-  << "Scene parameters:" << endl
-  << "\tTotal pixels = " << ph * pw << endl << endl;
-
-  printf("Shyoujyou rendering...\n");
-
-#ifdef USE_TBB
-  tbb::parallel_for(0, ph, [&](int y) {
-    tbb::parallel_for(0, pw, [&](int x) {
-#else
-  for (int y = 0; y < ph; ++y) {
-    for (int x = 0; x < pw; ++x) {
-#endif
-      ++pixel_cnt;
-      if (pixel_cnt % PROGRESS_SAMPLE_RATE == 0) {
-        auto time_elapsed = chrono::duration_cast<chrono::seconds>(
-                    chrono::steady_clock::now() - begin).count();
-        time_elapsed = FEQ(time_elapsed, 0.0) ? 1.0 : time_elapsed;
-
-        printf(
-#if defined(__clang__)
-               "Rendered % 2.2lf%% in %lld seconds, % 2.2lld pixels/s...\r",
-#else
-               "Rendered % 2.2lf%% in %ld seconds, % 2.2ld pixels/s...\r",
-#endif
-               pixel_cnt / total_cnt,
-               time_elapsed,
-               pixel_cnt / time_elapsed);
-        fflush(stdout);
-      }
-
+  for (int x = pxs; x <= pxe; ++x) {
+    for (int y = pys; y <= pye; ++y) {
       float3 clr(0., 0., 0.);
       for (int p = 0; p < NSAMPLE; ++p) {
         for (int q = 0; q < NSAMPLE; ++q) {
@@ -455,7 +382,7 @@ Camera::render()
 
           for (; o < DOFNSAMPLE; ++o) {
             float3 rand_point = this->u * (dst(e2) - 0.5)
-                                + this->v * (dst(e2) - 0.5);
+            + this->v * (dst(e2) - 0.5);
             rand_point *= this->aperture_size;
 
             r.d *= this->lens;
@@ -487,13 +414,120 @@ Camera::render()
 #endif
         }
       }
-
+      
       set_pixel(x, y, clr * (1. / SQ(NSAMPLE)));
+    }
+  }
+}
+
+void
+Camera::render()
+{
+#ifdef PROGRESS
+#define PROGRESS_SAMPLE_RATE 5
+#endif
+
+  cout << endl
+  << "Renderer parameters:" << endl
+  << "\tRendering with BVH tree = " << "Yes" << endl
+  << "\tSoft shadow = " << "Yes if an area light is included in the scene"
+                        << endl
+#ifdef FEAT_GLOSSY
+  << "\tGlossy effect = "
+  << "Yes if a glossy material is included in the scene" << endl
+#endif
+#ifdef FEAT_REFRACT
+  << "\tRefractions = "
+  << "Yes if a refractive material is included in the scene" << endl
+#endif
+#ifdef FEAT_DOF
+  << "\tDepth of field = " << "Yes if the camera is set with related parameters"
+                        << endl
+#endif
+#ifdef CUTTHRU
+  << "\tRay color epsilon cut-through = " << "Yes" << endl
+#endif
+  << "\tTiling = " << "Yes" << endl
+#ifdef PROGRESS
+  << "\tProgress = " << "Yes" << endl
+#endif
+  << endl
+  << "\tMaximal recursion limit = " << MAXRECUR << endl
+  << "\tEpsilon = " << SEPSILON << endl
+  << "\tPrimary rays per pixel = " << SQ(NSAMPLE) << endl
+  << "\tShadow rays per primary ray = " << SQ(SHDNSAMPLE) << endl
+#ifdef FEAT_GLOSSY
+  << "\tGlossy rays per primary ray = " << GLSNSAMPLE << endl
+#endif
+  << "\tTile size = " << TILE_SIZE << endl
+#ifdef PROGRESS
+  << "\tProgress sample rate = every " << PROGRESS_SAMPLE_RATE << " pixels"
+#endif
+  << endl
+#ifdef FEAT_DOF
+  << "\tDoF rays per primary ray = " << DOFNSAMPLE << endl
+  << "\tAperture size = " << aperture_size << endl
+  << "\tFocal depth = " << lens << endl
+#endif
+  ;
+  auto begin = chrono::steady_clock::now();
+
+  int sqtile = SQ(TILE_SIZE);
+  int total_tiles = std::ceil((1.0 * ph * pw) / sqtile);
+#ifdef PROGRESS
+  double dtotal_tiles = total_tiles;
+#endif
+
+  int total_xn = std::ceil(1.0 * pw / TILE_SIZE);
+
+  cout << endl
+  << "Scene parameters:" << endl
+  << "\tTotal pixels = " << ph * pw << endl
+  << "\tTotal tiles = " << int(total_tiles) << endl
+  << endl;
+
+  printf("Shyoujyou rendering...\n");
+
+  int pwm1 = pw - 1;
+  int phm1 = ph - 1;
+
 #ifdef USE_TBB
-    });
+  tbb::parallel_for(0, total_tiles, [&](int tn) {
+#else
+  for (int tn = 0; tn < total_tiles; ++tn) {
+#endif
+    int ty = tn / total_xn;
+    int tx = tn % total_xn;
+    int actual_pxs = tx * TILE_SIZE;
+    int actual_pxe = min((tx + 1) * TILE_SIZE - 1, pwm1);
+    int actual_pys = ty * TILE_SIZE;
+    int actual_pye = min((ty + 1) * TILE_SIZE - 1, phm1);
+
+    render(actual_pxs, actual_pxe, actual_pys, actual_pye);
+
+#ifdef PROGRESS
+    if (tn % PROGRESS_SAMPLE_RATE == 0) {
+      auto time_elapsed = chrono::
+      duration_cast<chrono::seconds>(chrono::
+                                     steady_clock::now() - begin).count();
+      time_elapsed = FEQ(time_elapsed, 0.0) ? 1.0 : time_elapsed;
+
+      printf(
+#if defined(__clang__)
+             "Rendered % 2.2lf%% in %lld seconds, % 2.2lld pixels/s...\r",
+#else
+             "Rendered % 2.2lf%% in %ld seconds, % 2.2ld pixels/s...\r",
+#endif
+             tn / dtotal_tiles,
+             time_elapsed,
+             tn * sqtile / time_elapsed);
+      fflush(stdout);
+    }
+#endif
+
+#ifdef USE_TBB
   });
 #else
-    }
   }
 #endif
 
