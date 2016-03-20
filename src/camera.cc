@@ -10,6 +10,10 @@
 
 #ifdef USE_TBB
 #include "tbb/tbb.h"
+#ifdef PROGRESS
+#include "tbb/concurrent_queue.h"
+#include <thread>
+#endif
 #endif
 
 using namespace std;
@@ -364,67 +368,26 @@ Camera::ray_color(int recursion_depth,
 void
 Camera::render(int pxs, int pxe, int pys, int pye)
 {
-  for (int x = pxs; x <= pxe; ++x) {
-    for (int y = pys; y <= pye; ++y) {
-      float3 clr(0., 0., 0.);
-      for (int p = 0; p < NSAMPLE; ++p) {
-        for (int q = 0; q < NSAMPLE; ++q) {
-          Ray r = ray(x + (p + dst(e2)) / NSAMPLE,
-                      y + (q + dst(e2)) / NSAMPLE);
 
-#ifdef FEAT_DOF
-          float3 sub;
-          int o = 0;
-
-#ifdef CUTTHRU
-          float3 last_tmp_sub(nanf(""), nanf(""), nanf(""));
-#endif
-
-          for (; o < DOFNSAMPLE; ++o) {
-            float3 rand_point = this->u * (dst(e2) - 0.5)
-            + this->v * (dst(e2) - 0.5);
-            rand_point *= this->aperture_size;
-
-            r.d *= this->lens;
-            r.d -= rand_point;
-            r.d.normalize_();
-
-            r.p += rand_point;
-
-#ifdef CUTTHRU
-            float3 tmp_sub;
-            ray_color(0, tmp_sub, r, 0, 0., numeric_limits<double>::max());
-            sub += tmp_sub;
-            if (!last_tmp_sub.is_nan()
-                && (tmp_sub - last_tmp_sub).is_epsilon()) {
-              break;
-            } else {
-              last_tmp_sub = tmp_sub;
-            }
-#else
-            ray_color(0, sub, r, 0,
-                      0., numeric_limits<double>::max());
-#endif
-          }
-          sub *= 1. / o;
-          clr += sub;
-#else
-          ray_color(0, clr, r, 0,
-                    0., numeric_limits<double>::max());
-#endif
-        }
-      }
-      
-      set_pixel(x, y, clr * (1. / SQ(NSAMPLE)));
-    }
-  }
 }
 
 void
 Camera::render()
 {
 #ifdef PROGRESS
-#define PROGRESS_SAMPLE_RATE 5
+#ifdef USE_TILING
+#define PROGRESS_SAMPLE_RATE 10
+#define PROGRESS_UNIT " tiles"
+#else
+#define PROGRESS_SAMPLE_RATE 700
+#define PROGRESS_UNIT " pixels"
+#endif
+#endif
+
+#ifdef FEAT_DOF
+  if (aperture_size < 1e-10) {
+    DOFNSAMPLE = 1;
+  }
 #endif
 
   cout << endl
@@ -447,7 +410,11 @@ Camera::render()
 #ifdef CUTTHRU
   << "\tRay color epsilon cut-through = " << "Yes" << endl
 #endif
+
+#ifdef USE_TILING
   << "\tTiling = " << "Yes" << endl
+#endif
+
 #ifdef PROGRESS
   << "\tProgress = " << "Yes" << endl
 #endif
@@ -459,9 +426,11 @@ Camera::render()
 #ifdef FEAT_GLOSSY
   << "\tGlossy rays per primary ray = " << GLSNSAMPLE << endl
 #endif
+#ifdef USE_TILING
   << "\tTile size = " << TILE_SIZE << endl
+#endif
 #ifdef PROGRESS
-  << "\tProgress sample rate = every " << PROGRESS_SAMPLE_RATE << " pixels"
+  << "\tProgress sample rate = every " << PROGRESS_SAMPLE_RATE << PROGRESS_UNIT
 #endif
   << endl
 #ifdef FEAT_DOF
@@ -472,41 +441,48 @@ Camera::render()
   ;
   auto begin = chrono::steady_clock::now();
 
+#ifdef USE_TILING
   int sqtile = SQ(TILE_SIZE);
   int total_tiles = std::ceil((1.0 * ph * pw) / sqtile);
 #ifdef PROGRESS
-  double dtotal_tiles = total_tiles;
+  double dtotal_tiles = total_tiles / 100.0;
 #endif
 
   int total_xn = std::ceil(1.0 * pw / TILE_SIZE);
-
+  int total_yn = std::ceil(1.0 * ph / TILE_SIZE);
+#endif
   cout << endl
   << "Scene parameters:" << endl
   << "\tTotal pixels = " << ph * pw << endl
+#ifdef USE_TILING
   << "\tTotal tiles = " << int(total_tiles) << endl
+#endif
   << endl;
 
+  double total_pixels = ph * pw / 100.0;
   printf("Shyoujyou rendering...\n");
 
-  int pwm1 = pw - 1;
-  int phm1 = ph - 1;
+#ifdef USE_TILING
+  int pxs, pxe, pys, pye;
+#endif
 
 #ifdef USE_TBB
-  tbb::parallel_for(0, total_tiles, [&](int tn) {
-#else
-  for (int tn = 0; tn < total_tiles; ++tn) {
-#endif
-    int ty = tn / total_xn;
-    int tx = tn % total_xn;
-    int actual_pxs = tx * TILE_SIZE;
-    int actual_pxe = min((tx + 1) * TILE_SIZE - 1, pwm1);
-    int actual_pys = ty * TILE_SIZE;
-    int actual_pye = min((ty + 1) * TILE_SIZE - 1, phm1);
-
-    render(actual_pxs, actual_pxe, actual_pys, actual_pye);
-
 #ifdef PROGRESS
-    if (tn % PROGRESS_SAMPLE_RATE == 0) {
+  tbb::concurrent_bounded_queue<int> prog_queue;
+  std::thread prog_t([&]() {
+    auto acc = 0;
+    int __t;
+    while (1) {
+      prog_queue.pop(__t);
+      if (__t < 0) {
+        break;
+      }
+
+      ++acc;
+      if (acc % PROGRESS_SAMPLE_RATE != 0) {
+        continue;
+      }
+
       auto time_elapsed = chrono::
       duration_cast<chrono::seconds>(chrono::
                                      steady_clock::now() - begin).count();
@@ -518,16 +494,145 @@ Camera::render()
 #else
              "Rendered % 2.2lf%% in %ld seconds, % 2.2ld pixels/s...\r",
 #endif
-             tn / dtotal_tiles,
+#ifdef USE_TILING
+             acc / dtotal_tiles,
              time_elapsed,
-             tn * sqtile / time_elapsed);
+             acc * sqtile / time_elapsed);
+#else
+             acc / total_pixels,
+             time_elapsed,
+             acc / time_elapsed);
+#endif
       fflush(stdout);
     }
+  });
+
+  prog_t.detach();
+#endif
+
+#ifdef USE_TILING
+  tbb::parallel_for(0, total_xn, [&](int tx) {
+    tbb::parallel_for(0, total_yn, [&](int ty) {
+#else
+  tbb::parallel_for(0, pw, [&](int x) {
+    tbb::parallel_for(0, ph, [&](int y) {
+#endif
+
+#else
+
+#ifdef USE_TILING
+  int tn = 0;
+  for (int tx = 0; tx < total_xn; ++tx) {
+    for (int ty = 0; ty < total_yn; ++ty) {
+      ++tn;
+#else
+  for (int x = 0; x < pw; ++x) {
+    for (int y = 0; y < ph; ++y) {
+#endif
+
+#endif
+
+#ifdef USE_TILING
+      pxs = tx * TILE_SIZE;
+      pxe = min((tx + 1) * TILE_SIZE, pw);
+      pys = ty * TILE_SIZE;
+      pye = min((ty + 1) * TILE_SIZE, ph);
+
+      for (int x = pxs; x < pxe; ++x) {
+        for (int y = pys; y < pye; ++y) {
+#endif
+          float3 clr(0., 0., 0.);
+          for (int p = 0; p < NSAMPLE; ++p) {
+            for (int q = 0; q < NSAMPLE; ++q) {
+              Ray r = ray(x + (p + dst(e2)) / NSAMPLE,
+                          y + (q + dst(e2)) / NSAMPLE);
+
+#ifdef FEAT_DOF
+              float3 sub;
+              int o = 0;
+
+#ifdef CUTTHRU
+              float3 last_tmp_sub(nanf(""), nanf(""), nanf(""));
+#endif
+
+              for (; o < DOFNSAMPLE; ++o) {
+                float3 rand_point = this->u * (dst(e2) - 0.5)
+                + this->v * (dst(e2) - 0.5);
+                rand_point *= this->aperture_size;
+
+                r.d *= this->lens;
+                r.d -= rand_point;
+                r.d.normalize_();
+
+                r.p += rand_point;
+
+#ifdef CUTTHRU
+                float3 tmp_sub;
+                ray_color(0, tmp_sub, r, 0, 0., numeric_limits<double>::max());
+                sub += tmp_sub;
+                if (!last_tmp_sub.is_nan()
+                    && (tmp_sub - last_tmp_sub).is_epsilon()) {
+                  break;
+                } else {
+                  last_tmp_sub = tmp_sub;
+                }
+#else
+                ray_color(0, sub, r, 0,
+                          0., numeric_limits<double>::max());
+#endif
+              }
+              sub *= 1. / o;
+              clr += sub;
+#else
+              ray_color(0, clr, r, 0,
+                        0., numeric_limits<double>::max());
+#endif
+            }
+          }
+          
+          set_pixel(x, y, clr * (1. / SQ(NSAMPLE)));
+#ifdef USE_TILING
+        }
+      }
+#endif
+
+#ifdef PROGRESS
+#ifdef USE_TBB
+#ifdef USE_TILING
+      prog_queue.push((pxe - pxs) * (pye - pys));
+#else
+      prog_queue.push(1);
+#endif
+#else
+      if (tn % PROGRESS_SAMPLE_RATE == 0) {
+        auto time_elapsed = chrono::
+        duration_cast<chrono::seconds>(chrono::
+                                       steady_clock::now() - begin).count();
+        time_elapsed = FEQ(time_elapsed, 0.0) ? 1.0 : time_elapsed;
+
+        printf(
+#if defined(__clang__)
+               "Rendered % 2.2lf%% in %lld seconds, % 2.2lld pixels/s...\r",
+#else
+               "Rendered % 2.2lf%% in %ld seconds, % 2.2ld pixels/s...\r",
+#endif
+               tn / dtotal_tiles,
+               time_elapsed,
+               tn * sqtile / time_elapsed);
+        fflush(stdout);
+      }
+#endif
 #endif
 
 #ifdef USE_TBB
+    });
   });
+#ifdef PROGRESS
+  prog_queue.push(-1);
+#endif
+
 #else
+    }
   }
 #endif
 
