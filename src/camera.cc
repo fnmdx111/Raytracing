@@ -268,7 +268,7 @@ Camera::ray_color(int recursion_depth,
       //   -2.5  -1.5   -0.5  0.5   1.5
       int samples_taken = 0;
 
-#ifdef CUTTHRU
+#ifdef SCUTTHRU
       float3 last_shd_accum(nanf(""), nanf(""), nanf(""));
 #endif
 
@@ -283,7 +283,7 @@ Camera::ray_color(int recursion_depth,
           do_shadow(*this, shd_accum, r, lgh, l, in);
           a += shd_accum; // * in.n.dot(l);
 
-#ifdef CUTTHRU
+#ifdef SCUTTHRU
           if (!last_shd_accum.is_nan()
               && (shd_accum - last_shd_accum).is_epsilon()) {
             // CUT-THROUGH
@@ -328,7 +328,7 @@ Camera::ray_color(int recursion_depth,
       float3 nv = rf * nu;
 
       float3 glossy_accum;
-#ifdef CUTTHRU
+#ifdef GCUTTHRU
       float3 last_accum(nanf(""), nanf(""), nanf(""));
 #endif
       int _cnt = 0;
@@ -337,7 +337,7 @@ Camera::ray_color(int recursion_depth,
         nrf.normalize_();
         Ray rr(nrf, in.p);
 
-#ifdef CUTTHRU
+#ifdef GCUTTHRU
         float3 tmp_accum;
         do_dirty(*this, tmp_accum, r, rr, mat, recursion_depth, in);
         glossy_accum += tmp_accum;
@@ -395,29 +395,59 @@ Camera::render()
   << "\tRendering with BVH tree = " << "Yes" << endl
   << "\tSoft shadow = " << "Yes if an area light is included in the scene"
                         << endl
-#ifdef FEAT_GLOSSY
   << "\tGlossy effect = "
-  << "Yes if a glossy material is included in the scene" << endl
+
+#ifdef FEAT_GLOSSY
+  << "Yes if a glossy material is included in the scene"
+#else
+  << "No"
 #endif
-#ifdef FEAT_REFRACT
+  << endl
+
   << "\tRefractions = "
-  << "Yes if a refractive material is included in the scene" << endl
+#ifdef FEAT_REFRACT
+  << "Yes if a refractive material is included in the scene"
+#else
+  << "No"
 #endif
+  << endl
+
+
+  << "\tDepth of field = "
 #ifdef FEAT_DOF
-  << "\tDepth of field = " << "Yes if the camera is set with related parameters"
-                        << endl
+  << "Yes if the camera is set with related parameters"
+#else
+  << "No"
 #endif
-#ifdef CUTTHRU
-  << "\tRay color epsilon cut-through = " << "Yes" << endl
-#endif
+  << endl
 
+
+  << "\tRay color epsilon cut-through = "
+#if defined(SCUTTHRU) || defined(GCUTTHRU) || defined(DCUTTHRU)
+  << "Yes"
+#else
+  << "No"
+#endif
+  << endl
+
+
+  << "\tTiling = "
 #ifdef USE_TILING
-  << "\tTiling = " << "Yes" << endl
+  << "Yes"
+#else
+  << "No"
 #endif
+ << endl
 
+
+  << "\tProgress = "
 #ifdef PROGRESS
-  << "\tProgress = " << "Yes" << endl
+  << "Yes"
+#else 
+  << "No"
 #endif
+  << endl
+
   << endl
   << "\tMaximal recursion limit = " << MAXRECUR << endl
   << "\tEpsilon = " << SEPSILON << endl
@@ -450,6 +480,10 @@ Camera::render()
 
   int total_xn = std::ceil(1.0 * pw / TILE_SIZE);
   int total_yn = std::ceil(1.0 * ph / TILE_SIZE);
+#else
+#ifdef PROGRESS
+  double total_pixels = ph * pw / 100.0;
+#endif
 #endif
   cout << endl
   << "Scene parameters:" << endl
@@ -459,15 +493,17 @@ Camera::render()
 #endif
   << endl;
 
-  double total_pixels = ph * pw / 100.0;
   printf("Shyoujyou rendering...\n");
 
 #ifdef USE_TILING
   int pxs, pxe, pys, pye;
 #endif
 
+  int tn = 0;
+
 #ifdef USE_TBB
 #ifdef PROGRESS
+#ifdef USE_TILING
   tbb::concurrent_bounded_queue<int> prog_queue;
   std::thread prog_t([&]() {
     auto acc = 0;
@@ -494,20 +530,15 @@ Camera::render()
 #else
              "Rendered % 2.2lf%% in %ld seconds, % 2.2ld pixels/s...\r",
 #endif
-#ifdef USE_TILING
              acc / dtotal_tiles,
              time_elapsed,
              acc * sqtile / time_elapsed);
-#else
-             acc / total_pixels,
-             time_elapsed,
-             acc / time_elapsed);
-#endif
       fflush(stdout);
     }
   });
 
   prog_t.detach();
+#endif
 #endif
 
 #ifdef USE_TILING
@@ -521,17 +552,17 @@ Camera::render()
 #else
 
 #ifdef USE_TILING
-  int tn = 0;
+
   for (int tx = 0; tx < total_xn; ++tx) {
     for (int ty = 0; ty < total_yn; ++ty) {
-      ++tn;
+
 #else
   for (int x = 0; x < pw; ++x) {
     for (int y = 0; y < ph; ++y) {
 #endif
 
 #endif
-
+      ++tn;
 #ifdef USE_TILING
       pxs = tx * TILE_SIZE;
       pxe = min((tx + 1) * TILE_SIZE, pw);
@@ -551,7 +582,7 @@ Camera::render()
               float3 sub;
               int o = 0;
 
-#ifdef CUTTHRU
+#ifdef DCUTTHRU
               float3 last_tmp_sub(nanf(""), nanf(""), nanf(""));
 #endif
 
@@ -566,7 +597,7 @@ Camera::render()
 
                 r.p += rand_point;
 
-#ifdef CUTTHRU
+#ifdef DCUTTHRU
                 float3 tmp_sub;
                 ray_color(0, tmp_sub, r, 0, 0., numeric_limits<double>::max());
                 sub += tmp_sub;
@@ -597,12 +628,8 @@ Camera::render()
 #endif
 
 #ifdef PROGRESS
-#ifdef USE_TBB
-#ifdef USE_TILING
+#if defined(USE_TILING) && defined(USE_TBB)
       prog_queue.push((pxe - pxs) * (pye - pys));
-#else
-      prog_queue.push(1);
-#endif
 #else
       if (tn % PROGRESS_SAMPLE_RATE == 0) {
         auto time_elapsed = chrono::
@@ -616,9 +643,15 @@ Camera::render()
 #else
                "Rendered % 2.2lf%% in %ld seconds, % 2.2ld pixels/s...\r",
 #endif
+#ifdef USE_TILING
                tn / dtotal_tiles,
                time_elapsed,
                tn * sqtile / time_elapsed);
+#else
+               tn / total_pixels,
+               time_elapsed,
+               tn / time_elapsed);
+#endif
         fflush(stdout);
       }
 #endif
@@ -627,7 +660,7 @@ Camera::render()
 #ifdef USE_TBB
     });
   });
-#ifdef PROGRESS
+#if defined(PROGRESS) && defined(USE_TBB) && defined(USE_TILING)
   prog_queue.push(-1);
 #endif
 
