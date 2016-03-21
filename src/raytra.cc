@@ -109,12 +109,12 @@ main(int argc, char** argv)
           *((Uint32*)target_pixel) =
           int(RB(let->r)) << 24 |
           int(RB(let->g)) << 16 |
-          int(RB(let->b)) << 8  |
+          int(RB(let->b)) << 8 |
           0xff;
 
           delete let;
 
-          if (pixels % 1000 == 0) {
+          if (pixels % PROGRESS_SAMPLE_RATE == 0) {
             SDL_LockSurface(surf);
             SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer,
                                                                 surf);

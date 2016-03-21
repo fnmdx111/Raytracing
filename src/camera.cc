@@ -386,16 +386,6 @@ Camera::render(int pxs, int pxe, int pys, int pye)
 void
 Camera::render()
 {
-#ifdef PROGRESS
-#ifdef USE_TILING
-#define PROGRESS_SAMPLE_RATE 10
-#define PROGRESS_UNIT " tiles"
-#else
-#define PROGRESS_SAMPLE_RATE 700
-#define PROGRESS_UNIT " pixels"
-#endif
-#endif
-
 #ifdef FEAT_DOF
   if (aperture_size < 1e-10) {
     DOFNSAMPLE = 1;
