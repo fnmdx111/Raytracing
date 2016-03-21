@@ -11,7 +11,7 @@
 #define PROGRESS_SAMPLE_RATE 10
 #define PROGRESS_UNIT " tiles"
 #else
-#define PROGRESS_SAMPLE_RATE 700
+#define PROGRESS_SAMPLE_RATE 1000
 #define PROGRESS_UNIT " pixels"
 #endif
 #endif
