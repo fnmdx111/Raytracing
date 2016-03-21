@@ -11,7 +11,7 @@ using namespace Imf;
 
 class Scene;
 
-#define MAXRECUR 4
+#define MAXRECUR 5
 
 #define CAMEPSILON -0.001
 

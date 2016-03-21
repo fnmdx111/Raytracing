@@ -179,7 +179,7 @@ do_dirty(Camera& cam, float3& accum,
     float3 ret_accum;
     float3 acc1;
     cam.ray_color(recursion_depth + 1, acc1, new_r, 0,
-                  SEPSILON, numeric_limits<double>::max());
+                  1e-3, numeric_limits<double>::max());
     ret_accum += acc1 * rR;
 
     cam.ray_color(recursion_depth + 1, acc1, tr, 0,
@@ -190,11 +190,11 @@ do_dirty(Camera& cam, float3& accum,
   } else
 #endif
     if (mat.is_reflective) {
-  float3 t_accum;
-  cam.ray_color(recursion_depth + 1, t_accum, new_r, 0,
-                SEPSILON, numeric_limits<double>::max());
-  accum += mat.i.pll_mul(t_accum);
-}
+      float3 t_accum;
+      cam.ray_color(recursion_depth + 1, t_accum, new_r, 0,
+                    SEPSILON, numeric_limits<double>::max());
+      accum += mat.i.pll_mul(t_accum);
+    }
 }
 
 extern int NSAMPLE;
