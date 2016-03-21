@@ -77,5 +77,19 @@ private:
   void build_tree();
 };
 
+
+struct Renderlet
+{
+  double r;
+  double g;
+  double b;
+  int x;
+  int y;
+  Renderlet(): r(0), g(0), b(0), x(0), y(0) {}
+  Renderlet(const float3& c, int px, int py): r(c.x), g(c.y), b(c.z),
+                                              x(px), y(py) {}
+
+};
+
 #endif
 

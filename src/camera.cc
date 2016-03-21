@@ -7,6 +7,7 @@
 #include <random>
 #include "shapes.hh"
 #include <cassert>
+#include "scene.hh"
 
 #ifdef USE_TBB
 #include "tbb/tbb.h"
@@ -14,6 +15,11 @@
 #include "tbb/concurrent_queue.h"
 #include <thread>
 #endif
+#endif
+
+#ifdef VISPROG
+#include "tbb/concurrent_queue.h"
+extern tbb::concurrent_bounded_queue<Renderlet*> rlet_queue;
 #endif
 
 using namespace std;
@@ -266,15 +272,17 @@ Camera::ray_color(int recursion_depth,
       // |     |     | pos |     |     |
       // | ^-2-0.5+r   ^-0.5+r
       //   -2.5  -1.5   -0.5  0.5   1.5
-      int samples_taken = 0;
 
 #ifdef SCUTTHRU
+      int samples_taken = 0;
       float3 last_shd_accum(nanf(""), nanf(""), nanf(""));
 #endif
 
       for (int rdi = 0; rdi < SHDNSAMPLE; ++rdi) {
         for (int rdj = 0; rdj < SHDNSAMPLE; ++rdj) {
+#ifdef SCUTTHRU
           ++samples_taken;
+#endif
           double ru = la->dst(la->e2) + rdi + la->hl;
           double rv = la->dst(la->e2) + rdj + la->hl;
           float3 l = la->l(in, ru, rv);
@@ -295,7 +303,11 @@ Camera::ray_color(int recursion_depth,
         }
       }
 
+#ifdef CUTTHRU
       accum += a * (1. / samples_taken);
+#else
+      accum += a * (1. / SQ(SHDNSAMPLE));
+#endif
 
     } else {
       float3 l = lgh.l(in);
@@ -620,8 +632,13 @@ Camera::render()
 #endif
             }
           }
-          
-          set_pixel(x, y, clr * (1. / SQ(NSAMPLE)));
+          clr *= 1. / SQ(NSAMPLE);
+
+#ifdef VISPROG
+          rlet_queue.push(new Renderlet(clr, x, y));
+#endif
+
+          set_pixel(x, y, clr);
 #ifdef USE_TILING
         }
       }
@@ -669,6 +686,9 @@ Camera::render()
   }
 #endif
 
+#ifdef VISPROG
+  rlet_queue.push(new Renderlet(float3(), -1, -1));
+#endif
   auto end = chrono::steady_clock::now();
 
   printf(
