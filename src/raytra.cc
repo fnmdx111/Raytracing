@@ -75,7 +75,11 @@ main(int argc, char** argv)
                                                0x00ff0000,
                                                0x0000ff00,
                                                0x000000ff);
-     
+      if (!surf) {
+        cerr << "Couldn't create surface: " << SDL_GetError() << endl;
+        goto SDL_CLEAN_UP;
+      }
+
       Renderlet* let;
       bool should_poll = true;
       int pixels = 0;
@@ -110,33 +114,45 @@ main(int argc, char** argv)
 
           delete let;
 
-          if (pixels % 200 == 0) {
+          if (pixels % 1000 == 0) {
             SDL_LockSurface(surf);
             SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer,
                                                                 surf);
             SDL_UnlockSurface(surf);
+            if (!texture) {
+              cerr << "Couldn't create texture from surface: " << SDL_GetError()
+                   << endl;
+              goto SDL_CLEAN_UP;
+            }
 
             SDL_RenderClear(renderer);
             SDL_RenderCopy(renderer, texture, NULL, NULL);
             SDL_RenderPresent(renderer);
             SDL_DestroyTexture(texture);
           }
+        } else {
+          SDL_LockSurface(surf);
+          SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer,
+                                                              surf);
+          SDL_UnlockSurface(surf);
+          if (!texture) {
+            cerr << "Couldn't create texture from surface: " << SDL_GetError()
+            << endl;
+            goto SDL_CLEAN_UP;
+          }
+
+          SDL_RenderClear(renderer);
+          SDL_RenderCopy(renderer, texture, NULL, NULL);
+          SDL_RenderPresent(renderer);
+          SDL_DestroyTexture(texture);
         }
       }
 
-      SDL_LockSurface(surf);
-      SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer,
-                                                          surf);
-      SDL_UnlockSurface(surf);
-
-      SDL_RenderClear(renderer);
-      SDL_RenderCopy(renderer, texture, NULL, NULL);
-      SDL_RenderPresent(renderer);
-      SDL_DestroyTexture(texture);
 
       SDL_FreeSurface(surf);
     }
 
+  SDL_CLEAN_UP:
     if (renderer) {
       SDL_DestroyRenderer(renderer);
       renderer = 0;
