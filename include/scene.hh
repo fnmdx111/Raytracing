@@ -6,14 +6,12 @@
 #include "lights.hh"
 #include "camera.hh"
 
-#ifdef PROGRESS
 #ifdef USE_TILING
 #define PROGRESS_SAMPLE_RATE 10
 #define PROGRESS_UNIT " tiles"
 #else
 #define PROGRESS_SAMPLE_RATE 1000
 #define PROGRESS_UNIT " pixels"
-#endif
 #endif
 
 class BVHNode : public Shape

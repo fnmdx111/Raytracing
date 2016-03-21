@@ -2,7 +2,7 @@
 #include "scene.hh"
 #include <algorithm>
 
-#ifdef VISPROG
+#ifdef VPROGRESS
 #include <thread>
 #include <SDL2/SDL.h>
 #include <tbb/concurrent_queue.h>
@@ -41,7 +41,7 @@ main(int argc, char** argv)
 
   Scene scene((string(argv[1])));
 
-#ifdef VISPROG
+#ifdef VPROGRESS
 
   std::thread t([&]() {
     scene.cam.render();

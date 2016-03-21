@@ -9,15 +9,15 @@
 #include <cassert>
 #include "scene.hh"
 
-#ifdef USE_TBB
+#ifdef MULTITHD
 #include "tbb/tbb.h"
-#ifdef PROGRESS
+#ifdef TPROGRESS
 #include "tbb/concurrent_queue.h"
 #include <thread>
 #endif
 #endif
 
-#ifdef VISPROG
+#ifdef VPROGRESS
 #include "tbb/concurrent_queue.h"
 extern tbb::concurrent_bounded_queue<Renderlet*> rlet_queue;
 #endif
@@ -273,14 +273,14 @@ Camera::ray_color(int recursion_depth,
       // | ^-2-0.5+r   ^-0.5+r
       //   -2.5  -1.5   -0.5  0.5   1.5
 
-#ifdef SCUTTHRU
+#ifdef SPRUNING
       int samples_taken = 0;
       float3 last_shd_accum(nanf(""), nanf(""), nanf(""));
 #endif
 
       for (int rdi = 0; rdi < SHDNSAMPLE; ++rdi) {
         for (int rdj = 0; rdj < SHDNSAMPLE; ++rdj) {
-#ifdef SCUTTHRU
+#ifdef SPRUNING
           ++samples_taken;
 #endif
           double ru = la->dst(la->e2) + rdi + la->hl;
@@ -291,7 +291,7 @@ Camera::ray_color(int recursion_depth,
           do_shadow(*this, shd_accum, r, lgh, l, in);
           a += shd_accum; // * in.n.dot(l);
 
-#ifdef SCUTTHRU
+#ifdef SPRUNING
           if (!last_shd_accum.is_nan()
               && (shd_accum - last_shd_accum).is_epsilon()) {
             // CUT-THROUGH
@@ -303,7 +303,7 @@ Camera::ray_color(int recursion_depth,
         }
       }
 
-#ifdef CUTTHRU
+#ifdef PRUNING
       accum += a * (1. / samples_taken);
 #else
       accum += a * (1. / SQ(SHDNSAMPLE));
@@ -340,7 +340,7 @@ Camera::ray_color(int recursion_depth,
       float3 nv = rf * nu;
 
       float3 glossy_accum;
-#ifdef GCUTTHRU
+#ifdef GPRUNING
       float3 last_accum(nanf(""), nanf(""), nanf(""));
 #endif
       int _cnt = 0;
@@ -349,7 +349,7 @@ Camera::ray_color(int recursion_depth,
         nrf.normalize_();
         Ray rr(nrf, in.p);
 
-#ifdef GCUTTHRU
+#ifdef GPRUNING
         float3 tmp_accum;
         do_dirty(*this, tmp_accum, r, rr, mat, recursion_depth, in);
         glossy_accum += tmp_accum;
@@ -425,7 +425,7 @@ Camera::render()
 
 
   << "\tRay color epsilon cut-through = "
-#if defined(SCUTTHRU) || defined(GCUTTHRU) || defined(DCUTTHRU)
+#if defined(SPRUNING) || defined(GPRUNING) || defined(DPRUNING)
   << "Yes"
 #else
   << "No"
@@ -443,9 +443,17 @@ Camera::render()
 
 
   << "\tProgress = "
-#ifdef PROGRESS
+#ifdef TPROGRESS
   << "Yes"
 #else 
+  << "No"
+#endif
+  << endl
+
+  << "\tProgress Visualization = "
+#ifdef VPROGRESS
+  << "Yes"
+#else
   << "No"
 #endif
   << endl
@@ -461,10 +469,10 @@ Camera::render()
 #ifdef USE_TILING
   << "\tTile size = " << TILE_SIZE << endl
 #endif
-#ifdef PROGRESS
+#if defined(TPROGRESS) || defined(VPROGRESS)
   << "\tProgress sample rate = every " << PROGRESS_SAMPLE_RATE << PROGRESS_UNIT
-#endif
   << endl
+#endif
 #ifdef FEAT_DOF
   << "\tDoF rays per primary ray = " << DOFNSAMPLE << endl
   << "\tAperture size = " << aperture_size << endl
@@ -476,14 +484,14 @@ Camera::render()
 #ifdef USE_TILING
   int sqtile = SQ(TILE_SIZE);
   int total_tiles = std::ceil((1.0 * ph * pw) / sqtile);
-#ifdef PROGRESS
+#ifdef TPROGRESS
   double dtotal_tiles = total_tiles / 100.0;
 #endif
 
   int total_xn = std::ceil(1.0 * pw / TILE_SIZE);
   int total_yn = std::ceil(1.0 * ph / TILE_SIZE);
 #else
-#ifdef PROGRESS
+#ifdef TPROGRESS
   double total_pixels = ph * pw / 100.0;
 #endif
 #endif
@@ -503,8 +511,8 @@ Camera::render()
 
   int tn = 0;
 
-#ifdef USE_TBB
-#ifdef PROGRESS
+#ifdef MULTITHD
+#ifdef TPROGRESS
 #ifdef USE_TILING
   tbb::concurrent_bounded_queue<int> prog_queue;
   std::thread prog_t([&]() {
@@ -584,7 +592,7 @@ Camera::render()
               float3 sub;
               int o = 0;
 
-#ifdef DCUTTHRU
+#ifdef DPRUNING
               float3 last_tmp_sub(nanf(""), nanf(""), nanf(""));
 #endif
 
@@ -599,7 +607,7 @@ Camera::render()
 
                 r.p += rand_point;
 
-#ifdef DCUTTHRU
+#ifdef DPRUNING
                 float3 tmp_sub;
                 ray_color(0, tmp_sub, r, 0, 0., numeric_limits<double>::max());
                 sub += tmp_sub;
@@ -624,7 +632,7 @@ Camera::render()
           }
           clr *= 1. / SQ(NSAMPLE);
 
-#ifdef VISPROG
+#ifdef VPROGRESS
           rlet_queue.push(new Renderlet(clr, x, y));
 #endif
 
@@ -634,8 +642,8 @@ Camera::render()
       }
 #endif
 
-#ifdef PROGRESS
-#if defined(USE_TILING) && defined(USE_TBB)
+#ifdef TPROGRESS
+#if defined(USE_TILING) && defined(MULTITHD)
       prog_queue.push((pxe - pxs) * (pye - pys));
 #else
       if (tn % PROGRESS_SAMPLE_RATE == 0) {
@@ -664,10 +672,10 @@ Camera::render()
 #endif
 #endif
 
-#ifdef USE_TBB
+#ifdef MULTITHD
     });
   });
-#if defined(PROGRESS) && defined(USE_TBB) && defined(USE_TILING)
+#if defined(TPROGRESS) && defined(MULTITHD) && defined(USE_TILING)
   prog_queue.push(-1);
 #endif
 
@@ -676,7 +684,7 @@ Camera::render()
   }
 #endif
 
-#ifdef VISPROG
+#ifdef VPROGRESS
   rlet_queue.push(new Renderlet(float3(), -1, -1));
 #endif
   auto end = chrono::steady_clock::now();
