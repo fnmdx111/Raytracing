@@ -433,6 +433,13 @@ Camera::render()
 #endif
   << endl
 
+  << "\tMultithreading = "
+#ifdef MULTITHD
+  << "Yes"
+#else
+  << "No"
+#endif
+  << endl
 
   << "\tTiling = "
 #ifdef USE_TILING

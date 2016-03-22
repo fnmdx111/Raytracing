@@ -5,7 +5,6 @@
 #include <ImfRgbaFile.h>
 #include <ImfArray.h>
 #include <random>
-#include <SDL2/SDL.h>
 
 using namespace Imf;
 
@@ -30,8 +29,6 @@ public:
   std::uniform_real_distribution<> dst;
 
   const Scene* scene;
-
-  SDL_Renderer* renderer;
 
   Array2D<Rgba> pixels;
 
