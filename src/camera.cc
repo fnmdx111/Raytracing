@@ -8,6 +8,7 @@
 #include "shapes.hh"
 #include <cassert>
 #include "scene.hh"
+#include <algorithm>
 
 #ifdef MULTITHD
 #include "tbb/tbb.h"
@@ -289,7 +290,7 @@ Camera::ray_color(int recursion_depth,
 
           float3 shd_accum;
           do_shadow(*this, shd_accum, r, lgh, l, in);
-          a += shd_accum; // * in.n.dot(l);
+          a += shd_accum * std::max(0.0, in.n.dot(l));
 
 #ifdef SPRUNING
           if (!last_shd_accum.is_nan()
@@ -424,7 +425,7 @@ Camera::render()
   << endl
 
 
-  << "\tRay color epsilon cut-through = "
+  << "\tRay color pruning = "
 #if defined(SPRUNING) || defined(GPRUNING) || defined(DPRUNING)
   << "Yes"
 #else

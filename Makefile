@@ -9,7 +9,7 @@ AFEATS = -DNDEBUG -DTPROGRESS -DFEAT_DOF -DMULTITHD -DFEAT_GLOSSY
 EFEATS = -DNDEBUG -DTPROGRESS -DFEAT_DOF -DGPRUNING -DMULTITHD -DVPROGRESS -DFEAT_GLOSSY -DFEAT_REFRACT
 
 all:
-	g++ -O3 -DNDEBUG -DTROGRESS src/*.cc -Iinclude `pkg-config --cflags OpenEXR` `pkg-config --libs OpenEXR` -o raytra --std=c++11
+	g++ -O3 -DNDEBUG -DTPROGRESS src/*.cc -Iinclude `pkg-config --cflags OpenEXR` `pkg-config --libs OpenEXR` -o raytra --std=c++11
 
 adv:
 	g++ -O3 $(AFEATS) src/*.cc $(LIBPATH) $(INCPATH) $(INCLUDES) $(LIBRARIES) -o raytra --std=c++11
