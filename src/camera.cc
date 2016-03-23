@@ -115,10 +115,19 @@ do_shadow(Camera& cam, float3& accum, const Ray& r, const Light& lgh,
   cam.ray_color(0, sclr, sr, &lgh, SEPSILON, shadow_t);
 
   if (!sclr.is_zero()) {
-    float3 nd = r.d * -1;
-    in.sp->mat->diffuse(accum, l, in.n, nd, lgh.clr);
+    if (lgh.type() == LightType::area) {
+      const LArea& a = dynamic_cast<const LArea&>(lgh);
+      l.negate();
 
-    in.sp->mat->specular(accum, l, in.n, nd, lgh.clr);
+      sclr *= std::max(0.0, l.dot(a.n));
+
+      l.negate();
+    }
+
+    float3 nd = r.d * -1;
+    in.sp->mat->diffuse(accum, l, in.n, nd, sclr);
+
+    in.sp->mat->specular(accum, l, in.n, nd, sclr);
   }
 }
 

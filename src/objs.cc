@@ -1,6 +1,7 @@
 #include "objs.hh"
 #include <vector>
 #include <cassert>
+#include <iostream>
 
 using namespace std;
 
