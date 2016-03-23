@@ -290,7 +290,7 @@ Camera::ray_color(int recursion_depth,
 
           float3 shd_accum;
           do_shadow(*this, shd_accum, r, lgh, l, in);
-          a += shd_accum * std::max(0.0, in.n.dot(l));
+          a += shd_accum;
 
 #ifdef SPRUNING
           if (!last_shd_accum.is_nan()
