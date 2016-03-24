@@ -117,11 +117,14 @@ do_shadow(Camera& cam, float3& accum, const Ray& r, const Light& lgh,
   if (!sclr.is_zero()) {
     if (lgh.type() == LightType::area) {
       const LArea& a = dynamic_cast<const LArea&>(lgh);
-      l.negate();
 
+      l.negate();
       sclr *= std::max(0.0, l.dot(a.n));
-
       l.negate();
+
+      sclr *= 1.0 / SQ(shadow_t + 1.0);
+      sclr *= std::max(0.0, l.dot(in.n));
+      sclr *= 20000;
     }
 
     float3 nd = r.d * -1;
